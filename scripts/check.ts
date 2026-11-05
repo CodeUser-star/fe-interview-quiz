@@ -34,7 +34,7 @@ setActivePinia(createPinia())
 console.log('\n[1] 样张题库配比')
 const bank = useBankStore()
 const qs = bank.questions
-check('总题量 40', qs.length === 40, `实际 ${qs.length}`)
+check('总题量 70', qs.length === 70, `实际 ${qs.length}`)
 
 const bySubject: Record<string, number> = {}
 const byType: Record<string, number> = {}
@@ -43,11 +43,11 @@ for (const q of qs) {
   byType[q.type] = (byType[q.type] ?? 0) + 1
 }
 const basic = qs.filter((q) => ['single', 'multi', 'judge'].includes(q.type))
-check('基础题 20', basic.length === 20, `实际 ${basic.length}`)
+check('基础题 50', basic.length === 50, `实际 ${basic.length}`)
 check('简答 10', (byType.short ?? 0) === 10, `实际 ${byType.short ?? 0}`)
 check('手撕 10', (byType.code ?? 0) === 10, `实际 ${byType.code ?? 0}`)
 
-for (const [s, n] of Object.entries({ js: 6, css: 4, vue: 4, browser: 3, network: 3 })) {
+for (const [s, n] of Object.entries({ js: 18, css: 12, vue: 14, browser: 3, network: 3 })) {
   const actual = basic.filter((q) => q.subject === s).length
   check(`基础 · ${s} ${n} 题`, actual === n, `实际 ${actual}`)
 }

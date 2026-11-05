@@ -2,13 +2,14 @@ import type { Question } from '../types'
 import { codeBlock } from '../lib/md'
 
 /**
- * 内置样张题库（阶段一验收用 40 题）
- * 基础 20：JS 6 / CSS 4 / Vue 4 / 浏览器 3 / 计网 3
+ * 内置题库（阶段二建设中，当前 70 题）
+ * 基础 50：JS 18 / CSS 12 / Vue 14 / 浏览器 3 / 计网 3
  * 简答 10（八股）
  * 手撕 10：算法 6 / JS 手写 4
+ * 目标 120：基础 70 / 八股 30 / 手撕 20
  */
 export const SEED_QUESTIONS: Question[] = [
-  // ============ JavaScript 6 ============
+  // ============ JavaScript 18 ============
   {
     id: 'q-js-001',
     type: 'single',
@@ -97,7 +98,176 @@ console.log('D')`,
       '箭头函数没有自己的 `this`、`arguments`、`prototype`，不能 `new`。它的 `this` 在定义时沿词法作用域向上查找，且 `call` / `apply` / `bind` 无法改变。\n\n所以「检测对象方法」这类场景不能用箭头函数，否则 `this` 会指向外层。',
   },
 
-  // ============ CSS 4 ============
+  // ---- JS 补题 12 ----
+  {
+    id: 'q-js-007',
+    type: 'single',
+    subject: 'js',
+    difficulty: 1,
+    tags: ['must-know', 'nowcoder-hot'],
+    title: '`[1, 2, 3].map(parseInt)` 的结果是？',
+    options: ['[1, 2, 3]', '[1, NaN, NaN]', '[1, NaN, 3]', '抛出 TypeError'],
+    answer: [1],
+    analysis:
+      '`map` 会把 `(元素, 下标, 数组)` 原样传给回调，而 `parseInt(str, radix)` 恰好只接收前两个参数，于是第二项的下标被当成了进制：\n\n- `parseInt(1, 0)` → 1（radix 为 0 时按十进制处理）\n- `parseInt(2, 1)` → NaN（1 不是合法进制）\n- `parseInt(3, 2)` → NaN（3 不是合法的二进制数字）\n\n正确写法是 `.map((v) => parseInt(v, 10))`，或者直接用 `.map(Number)`。',
+  },
+  {
+    id: 'q-js-008',
+    type: 'single',
+    subject: 'js',
+    difficulty: 1,
+    tags: ['must-know'],
+    title: '关于 `let`、`const` 与 `var`，下列说法正确的是？',
+    options: [
+      '`let` 声明的变量不存在变量提升',
+      '全局作用域下 `var` 声明的变量会成为 window 的属性，`let` 不会',
+      '`const` 声明的对象，其属性也不能再修改',
+      '三者的区别只在于作用域写法，运行时行为完全一致',
+    ],
+    answer: [1],
+    analysis:
+      '`let`/`const` 同样会提升，但会进入**暂时性死区**（TDZ），声明前访问直接抛 `ReferenceError`——这常被误认为「没有提升」。\n\n三者真正的差别：\n\n- 作用域：`var` 是函数作用域，`let`/`const` 是块级作用域\n- 全局声明：`var` 会成为 `window` 属性，`let`/`const` 存在脚本作用域里\n- `const` 约束的是**绑定不可重新赋值**，对象内容照样能改（要冻结用 `Object.freeze`）',
+  },
+  {
+    id: 'q-js-009',
+    type: 'single',
+    subject: 'js',
+    difficulty: 2,
+    tags: ['nowcoder-hot', 'must-know'],
+    title: `严格模式下，下面代码输出什么？\n\n${codeBlock(
+      'js',
+      `'use strict'
+const obj = { name: 'obj', fn() { return this?.name } }
+const f = obj.fn
+console.log(obj.fn(), f())`,
+    )}`,
+    options: ['obj undefined', 'obj obj', 'obj null', '抛出 TypeError'],
+    answer: [0],
+    analysis:
+      '`this` 的指向在**调用时**决定，跟函数定义在哪无关：\n\n- `obj.fn()` 是方法调用，`this` 指向 `obj`，得到 `obj`\n- `f()` 是普通函数调用，严格模式下 `this` 为 `undefined`，`this?.name` 短路得到 `undefined`\n\n非严格模式里普通调用的 `this` 会被替换成全局对象，这正是不推荐隐式 this 的原因。',
+  },
+  {
+    id: 'q-js-010',
+    type: 'multi',
+    subject: 'js',
+    difficulty: 1,
+    tags: ['must-know'],
+    title: '以下哪些值放在 `if` 判断中会被当作 `false`？',
+    options: ['0', "''", '[]', 'null', "'0'"],
+    answer: [0, 1, 3],
+    analysis:
+      'JS 的假值只有 8 个：`false`、`0`、`-0`、`0n`、`""`、`null`、`undefined`、`NaN`。\n\n`[]` 是对象，对象恒为真；字符串 `"0"` 非空，同样为真——这两项是面试中最常设的坑。',
+  },
+  {
+    id: 'q-js-011',
+    type: 'judge',
+    subject: 'js',
+    difficulty: 2,
+    tags: ['must-know'],
+    title: '`0.1 + 0.2 === 0.3` 的结果是 `true`。',
+    answer: false,
+    analysis:
+      '实际结果是 `0.30000000000000004`。原因是 IEEE 754 双精度浮点用二进制表示小数，0.1 与 0.2 都无法精确表示，相加后误差被放大。\n\n判断浮点相等要写成 `Math.abs(a - b) < Number.EPSILON`；涉及金额的场景直接用以分为单位的整数运算。',
+  },
+  {
+    id: 'q-js-012',
+    type: 'single',
+    subject: 'js',
+    difficulty: 2,
+    tags: ['must-know', 'nowcoder-hot'],
+    title: `以下代码中，\`p.__proto__\` 指向谁？\n\n${codeBlock(
+      'js',
+      `function Person(name) { this.name = name }
+const p = new Person('Tom')`,
+    )}`,
+    options: ['Person', 'Person.prototype', 'Object.prototype', 'Function.prototype'],
+    answer: [1],
+    analysis:
+      '`new` 会把实例的内部原型指针指向构造函数的 `prototype`，所以 `p.__proto__ === Person.prototype`。\n\n顺带记住两条链：`Person.prototype.__proto__` 才是 `Object.prototype`；而 `Person.__proto__` 指向 `Function.prototype`（构造函数本身也是函数）。规范写法是 `Object.getPrototypeOf(p)`。',
+  },
+  {
+    id: 'q-js-013',
+    type: 'single',
+    subject: 'js',
+    difficulty: 2,
+    tags: ['browser-core'],
+    title: '`el.addEventListener("click", fn, true)` 第三个参数 `true` 表示？',
+    options: ['只触发一次', '在捕获阶段触发', '阻止默认行为', '改为被动监听'],
+    answer: [1],
+    analysis:
+      '第三个参数 `true` 等价于 `{ capture: true }`，让回调在**捕获阶段**（由外向内）执行；默认 `false` 是冒泡阶段（由内向外）。\n\n只触发一次用 `{ once: true }`，滚动性能优化用 `{ passive: true }`。阻止冒泡是 `event.stopPropagation()`，与这个参数无关。',
+  },
+  {
+    id: 'q-js-014',
+    type: 'multi',
+    subject: 'js',
+    difficulty: 2,
+    tags: ['must-know'],
+    title: '以下哪些数组方法**不会**改变原数组？',
+    options: ['push', 'slice', 'splice', 'concat'],
+    answer: [1, 3],
+    analysis:
+      '会原地修改的有：`push`/`pop`/`shift`/`unshift`/`splice`/`sort`/`reverse`/`fill`。\n\n返回新数组的有：`slice`/`concat`/`map`/`filter`/`flat`。\n\n`splice` 最容易记混——名字只和 `slice` 差一个字母，但它既删又插，改的是原数组。',
+  },
+  {
+    id: 'q-js-015',
+    type: 'single',
+    subject: 'js',
+    difficulty: 3,
+    tags: ['nowcoder-hot', 'must-know'],
+    title: `下面代码输出什么？\n\n${codeBlock(
+      'js',
+      `for (var i = 0; i < 3; i++) {
+  setTimeout(() => console.log(i))
+}`,
+    )}`,
+    options: ['0 1 2', '3 3 3', '0 0 0', 'undefined undefined undefined'],
+    answer: [1],
+    analysis:
+      '`var` 是函数作用域，三个箭头函数共享同一个 `i`。循环是同步跑完的，等定时器回调执行时 `i` 已经是 3。\n\n三种改法：\n\n1. 改成 `let`——每轮迭代创建独立绑定，输出 `0 1 2`\n2. 用 IIFE 把 `i` 作为参数传进去\n3. 用 `setTimeout(fn, 0, i)` 把值当参数传',
+  },
+  {
+    id: 'q-js-016',
+    type: 'single',
+    subject: 'js',
+    difficulty: 2,
+    tags: ['must-know'],
+    title: '关于 `new Foo()` 的执行过程，正确的顺序是？',
+    options: [
+      '先执行构造函数，再把实例的原型指向 `Foo.prototype`',
+      '先创建空对象并把它的原型指向 `Foo.prototype`，再以它为 `this` 执行构造函数',
+      '直接把 `Foo.prototype` 复制一份作为实例返回',
+      '先调用 `Foo()`，再判断返回值是否为对象',
+    ],
+    answer: [1],
+    analysis:
+      '标准四步：\n\n1. 创建一个空对象\n2. 把它的 `[[Prototype]]` 指向 `Foo.prototype`\n3. 以该对象为 `this` 执行构造函数\n4. 构造函数返回的是对象就用它，否则返回第 1 步创建的对象\n\n第 4 步是很多人漏掉的细节——返回原始值会被忽略。',
+  },
+  {
+    id: 'q-js-017',
+    type: 'judge',
+    subject: 'js',
+    difficulty: 1,
+    tags: ['must-know'],
+    title: '`typeof [] === "array"` 的结果是 `true`。',
+    answer: false,
+    analysis:
+      '`typeof` 对数组返回 `"object"`——它只能区分到「对象」这一层，无法识别具体类型。\n\n判断数组用 `Array.isArray()`；要更细地区分类型可以用 `Object.prototype.toString.call(v)`，返回 `[object Array]`。',
+  },
+  {
+    id: 'q-js-018',
+    type: 'single',
+    subject: 'js',
+    difficulty: 2,
+    tags: ['must-know'],
+    title: '`const a = 0` 时，`a || 10` 与 `a ?? 10` 的结果分别是？',
+    options: ['10 10', '0 0', '10 0', '0 10'],
+    answer: [2],
+    analysis:
+      '`||` 判断的是**真值**，`0` 是假值，所以取右边的 10；`??` 只在左侧为 `null` 或 `undefined` 时才兜底，`0` 被原样保留。\n\n所以处理「允许为 0 的数值配置」时必须用 `??`，否则用户填 0 会被默认值覆盖。',
+  },
+
+  // ============ CSS 12 ============
   {
     id: 'q-css-001',
     type: 'single',
@@ -151,7 +321,124 @@ console.log('D')`,
       '只要祖先元素设置了 `transform` / `filter` / `perspective` / `will-change: transform` / `contain: paint`，该祖先就会成为 fixed 元素的包含块，导致「fixed 不相对视口」的经典 bug。\n\n排查思路：往上找有没有动画或 `will-change` 的容器。',
   },
 
-  // ============ Vue 4 ============
+  // ---- CSS 补题 8 ----
+  {
+    id: 'q-css-005',
+    type: 'single',
+    subject: 'css',
+    difficulty: 1,
+    tags: ['css-layout', 'must-know'],
+    title: '设置 `box-sizing: border-box` 后，`width: 200px` 表示的是？',
+    options: [
+      '内容区宽度为 200px',
+      '内容 + padding + border 的合计宽度为 200px',
+      '包含 margin 在内的总宽度为 200px',
+      '仅 border 内的可绘制区域为 200px',
+    ],
+    answer: [1],
+    analysis:
+      '默认的 `content-box` 下，`width` 只指内容区，实际占位要再加上 padding 与 border，布局时经常算错。\n\n`border-box` 把 padding 和 border 算进 `width`，写「这列固定 200px」时所见即所得，所以几乎每个项目都会全局重置 `* { box-sizing: border-box }`。两种模式都**不包含 margin**。',
+  },
+  {
+    id: 'q-css-006',
+    type: 'single',
+    subject: 'css',
+    difficulty: 1,
+    tags: ['css-layout', 'must-know'],
+    title: '用 Flex 让子元素在容器内水平垂直居中，正确的写法是？',
+    options: [
+      'justify-content: center; align-items: center',
+      'align-content: center; justify-items: center',
+      'text-align: center; vertical-align: middle',
+      'place-self: center',
+    ],
+    answer: [0],
+    analysis:
+      'Flex 里主轴方向的对齐用 `justify-content`，交叉轴用 `align-items`，两条都设 `center` 即可居中。\n\n常见混淆点：`align-content` 只在**多行**（`flex-wrap: wrap`）时才生效；`justify-items` 属于 Grid；`vertical-align` 只对行内元素或表格单元格有效。',
+  },
+  {
+    id: 'q-css-007',
+    type: 'multi',
+    subject: 'css',
+    difficulty: 2,
+    tags: ['must-know'],
+    title: '以下哪些 CSS 属性默认会被子元素**继承**？',
+    options: ['color', 'font-size', 'margin', 'line-height'],
+    answer: [0, 1, 3],
+    analysis:
+      '默认继承的大多是**文本相关**属性：`color`、`font-*`、`line-height`、`text-align`、`letter-spacing`、`visibility`、`cursor`。\n\n不继承的是**盒模型相关**属性：`margin`、`padding`、`border`、`width`、`height`、`background`。想强制继承可以显式写 `margin: inherit`。',
+  },
+  {
+    id: 'q-css-008',
+    type: 'single',
+    subject: 'css',
+    difficulty: 3,
+    tags: ['css-layout'],
+    title: '父元素加了 `transform: translateZ(0)` 后，子元素 `z-index: 9999` 仍被外部元素盖住，最可能的原因是？',
+    options: [
+      '子元素没有设置 position',
+      '父元素因此创建了新的层叠上下文，子元素的 z-index 只在父级内部比较',
+      'z-index 只对 fixed 定位生效',
+      'transform 会把所有子元素的 z-index 重置为 0',
+    ],
+    answer: [1],
+    analysis:
+      '`transform`、`filter`、`opacity < 1`、`will-change`、`isolation: isolate` 等都会**创建层叠上下文**。一旦父元素成为层叠上下文，子元素的 `z-index` 就只在这个上下文内部排序，无法越过父级去和外部元素竞争。\n\n排查手段：看 DevTools 的 Layers 面板，或临时去掉父元素的 transform 验证。',
+  },
+  {
+    id: 'q-css-009',
+    type: 'judge',
+    subject: 'css',
+    difficulty: 2,
+    tags: ['css-layout', 'must-know'],
+    title: '`em` 与 `rem` 都是相对于根元素（html）的字体大小计算的。',
+    answer: false,
+    analysis:
+      '只有 `rem` 相对根元素；`em` 相对**当前元素的 font-size**，而当 `em` 用在 `font-size` 本身时，则相对父元素的字体大小。\n\n这会导致 `em` 层层嵌套时不断放大，是移动端适配优先用 `rem` 或 `vw` 的原因。',
+  },
+  {
+    id: 'q-css-010',
+    type: 'single',
+    subject: 'css',
+    difficulty: 2,
+    tags: ['css-layout'],
+    title: '`grid-template-columns: repeat(3, 1fr)` 的含义是？',
+    options: ['创建三行等高', '创建三列等宽，平分剩余空间', '每列固定 3px', '定义三个命名网格区域'],
+    answer: [1],
+    analysis:
+      '`repeat(3, 1fr)` 等价于 `1fr 1fr 1fr`。`fr` 是「剩余空间的比例单位」，会先扣掉 `gap` 与固定宽度再按比例分配。\n\n三列等宽还能写 `grid-template-columns: repeat(3, minmax(0, 1fr))`，加上 `minmax(0, …)` 可以防止内容撑破列宽。',
+  },
+  {
+    id: 'q-css-011',
+    type: 'single',
+    subject: 'css',
+    difficulty: 1,
+    tags: ['css-layout'],
+    title: '`li:nth-child(2n + 1)` 会选中哪些元素？',
+    options: ['第 2、4、6… 个', '第 1、3、5… 个', '只有第 2 个', '所有索引为偶数的子元素'],
+    answer: [1],
+    analysis:
+      '`2n + 1` 从 `n = 0` 开始依次得到 1、3、5…，即奇数位，等价于 `nth-child(odd)`；偶数位是 `2n` 或 `nth-child(even)`。\n\n注意 `nth-child` 按**位置**计数，与元素类型无关；想只按同类元素计数要用 `nth-of-type`。',
+  },
+  {
+    id: 'q-css-012',
+    type: 'single',
+    subject: 'css',
+    difficulty: 3,
+    tags: ['must-know', 'project'],
+    title: '做位移或缩放动画时，推荐用 `transform` 而不是 `top / left`，主要原因是？',
+    options: [
+      '`transform` 不触发布局与重绘，可以直接在合成线程完成',
+      '`transform` 的浏览器兼容性更好',
+      '`transform` 不会影响文档流，所以不需要浏览器参与渲染',
+      '`top / left` 只能用于定位元素，动画无效',
+    ],
+    answer: [0],
+    analysis:
+      '改 `top / left` 会走「布局（重排）→ 绘制（重绘）→ 合成」全流程，主线程压力大、容易掉帧。\n\n`transform` 与 `opacity` 只影响合成阶段，可以交给合成线程处理，配合 `will-change: transform` 提前提升为独立图层更稳（但别滥用，每个图层都占显存）。',
+  },
+
+  // ============ Vue 14 ============
   {
     id: 'q-vue-001',
     type: 'single',
@@ -214,6 +501,172 @@ console.log('D')`,
     answer: [0],
     analysis:
       '`<script setup>` 默认是封闭的，组件实例不对外暴露任何内容，必须显式 `defineExpose({ reset })`。\n\n父组件 `const child = ref()` + `child.value.reset()`，且要确保子组件已挂载（`onMounted` 之后）。',
+  },
+
+  // ---- Vue 补题 10 ----
+  {
+    id: 'q-vue-005',
+    type: 'single',
+    subject: 'vue',
+    difficulty: 1,
+    tags: ['vue-core', 'must-know'],
+    title: '`created` 与 `mounted` 的核心区别是？',
+    options: [
+      '`created` 时访问不到 DOM，`mounted` 时已经可以访问',
+      '`created` 只执行一次，`mounted` 可能执行多次',
+      '`created` 是 Vue2 的写法，Vue3 已移除',
+      '`mounted` 在服务端渲染时也会执行',
+    ],
+    answer: [0],
+    analysis:
+      '`created` 时实例已创建、响应式数据可用，但模板还没挂载，拿不到 `$el`；`mounted` 在首次渲染成真实 DOM 之后触发，适合做需要 DOM 的初始化（图表、聚焦、测量尺寸）。\n\nVue3 的 `<script setup>` 里两者都不常用，`onMounted` 是最常用的挂载钩子；SSR 时 `mounted` 不会执行，只有 `setup` 与 `created` 之前的逻辑会跑。',
+  },
+  {
+    id: 'q-vue-006',
+    type: 'single',
+    subject: 'vue',
+    difficulty: 2,
+    tags: ['vue-core', 'must-know'],
+    title: '`v-for` 中加 `key` 的主要作用是？',
+    options: [
+      '防止组件内存泄漏',
+      '帮助 diff 算法复用正确的节点，避免状态错位',
+      '提高列表的渲染优先级',
+      '让数组的响应式更新生效',
+    ],
+    answer: [1],
+    analysis:
+      'Vue 更新列表时会尽量复用已有节点，`key` 是判断「这是不是同一个节点」的唯一依据。\n\n用下标当 `key`，在插入或排序时节点会被错位复用——典型现象是输入框内容跟着行跑到了别的数据上。正确做法是用稳定的唯一 id。',
+  },
+  {
+    id: 'q-vue-007',
+    type: 'multi',
+    subject: 'vue',
+    difficulty: 2,
+    tags: ['vue-core'],
+    title: 'Vue3 中父子组件通信，以下哪些做法是合适的？',
+    options: [
+      '父传子用 props，子传父用 emit',
+      '跨层级用 provide / inject',
+      '父组件通过 ref 调用子组件 `defineExpose` 暴露的方法',
+      '子组件直接修改父组件传入的对象内部字段',
+    ],
+    answer: [0, 1, 2],
+    analysis:
+      '前三项都是官方推荐方式，各有适用场景：\n\n- props / emit：最基础，单向数据流清晰\n- provide / inject：跨多层，避免 props 逐层透传\n- ref + defineExpose：父组件主动调用子组件方法，适合表单校验、聚焦等命令式操作\n\n第四项错误：直接改父组件的数据会破坏单向数据流，调试时很难追溯来源，应该 emit 事件让父级自己改。',
+  },
+  {
+    id: 'q-vue-008',
+    type: 'single',
+    subject: 'vue',
+    difficulty: 2,
+    tags: ['vue-core', 'nowcoder-hot'],
+    title: '`nextTick` 的作用是？',
+    options: [
+      '把回调推迟到下一个宏任务执行',
+      '等待本次 DOM 更新完成后再执行回调',
+      '强制同步刷新 DOM',
+      '取消上一次尚未生效的响应式更新',
+    ],
+    answer: [1],
+    analysis:
+      'Vue 的 DOM 更新是**异步批处理**的：改完响应式数据后，DOM 并没有立刻变。`nextTick` 的回调会被排到本次更新队列刷完之后，因此能拿到最新的 DOM。\n\n最典型的用法是改完列表后立刻滚动到底部或测量高度。它内部用的是微任务（`Promise.then`），所以执行时机早于 `setTimeout`。',
+  },
+  {
+    id: 'q-vue-009',
+    type: 'single',
+    subject: 'vue',
+    difficulty: 2,
+    tags: ['vue-core'],
+    title: '`<keep-alive>` 的作用是？',
+    options: [
+      '缓存组件实例，切换时保留状态并避免重复创建',
+      '缓存组件的接口请求结果',
+      '阻止组件卸载时发生内存泄漏',
+      '让组件只在首次渲染时执行一次',
+    ],
+    answer: [0],
+    analysis:
+      '被 `<keep-alive>` 包裹的组件失活时会触发 `deactivated` 而不是 `unmounted`，实例与状态被保留，重新进入触发 `activated`——常用于列表页 ↔ 详情页来回切换时保住滚动位置和筛选条件。\n\n用 `include` / `exclude` 指定要缓存的组件名；缓存本身占内存，不需要时应及时清理。',
+  },
+  {
+    id: 'q-vue-010',
+    type: 'judge',
+    subject: 'vue',
+    difficulty: 2,
+    tags: ['vue-core', 'must-know'],
+    title: '`ref` 在模板里可以直接使用，但在 `<script setup>` 中必须通过 `.value` 访问。',
+    answer: true,
+    analysis:
+      '模板编译时会自动补上 `.value`，所以写 `{{ count }}` 就行；脚本里 `ref` 返回的是一个带 `.value` 的对象，不写就拿到整个 ref 对象。\n\n例外：`ref` 被放进 `reactive` 对象或是数组元素时也会自动解包，这点最容易被绕晕——不确定时直接 `.value` 最稳。',
+  },
+  {
+    id: 'q-vue-011',
+    type: 'single',
+    subject: 'vue',
+    difficulty: 2,
+    tags: ['vue-core', 'project'],
+    title: '路由写成 `component: () => import("./views/Detail.vue")` 的好处是？',
+    options: [
+      '代码分割，首屏只加载当前路由需要的 chunk',
+      '自动开启服务端渲染',
+      '避免组件重复渲染',
+      '提前预加载所有路由组件',
+    ],
+    answer: [0],
+    analysis:
+      '动态 `import()` 会把该组件单独打成一个 chunk，首屏只下载当前路由的代码，其余按需加载——这是单页应用最基础的体积优化。\n\n代价是切换路由时多一次网络请求，交互频繁的路由可以配合预加载（如 hover 时 `import()`）或用打包工具的 `prefetch` 提示。',
+  },
+  {
+    id: 'q-vue-012',
+    type: 'single',
+    subject: 'vue',
+    difficulty: 3,
+    tags: ['vue-core'],
+    title: '以下哪一项**不属于** Vue3 在编译阶段做的优化？',
+    options: [
+      '静态提升（hoistStatic）',
+      '补丁标记（patchFlag）',
+      '事件缓存（cacheHandlers）',
+      '自动把 `v-if` 转换成 `v-show`',
+    ],
+    answer: [3],
+    analysis:
+      'Vue3 的编译优化目标是「让运行时少做无用的比较」：\n\n- **静态提升**：把不会变的节点提到 render 函数外，只创建一次\n- **patchFlag**：给动态节点打标记，diff 时只比较真正会变的部分\n- **事件缓存**：内联事件不再每次渲染重建函数\n\n`v-if` 与 `v-show` 的语义完全不同（是否销毁 DOM），编译器不会也不能自动互换。',
+  },
+  {
+    id: 'q-vue-013',
+    type: 'multi',
+    subject: 'vue',
+    difficulty: 2,
+    tags: ['vue-core', 'project'],
+    title: 'Composition API 相比 Options API 的优势包括？',
+    options: [
+      '相关逻辑按功能聚合，而不是散落在 data / methods / watch 里',
+      '对 TypeScript 的类型推导更友好',
+      '可以用组合函数（composable）跨组件复用逻辑',
+      '能让应用的运行时性能必然更高',
+    ],
+    answer: [0, 1, 2],
+    analysis:
+      '前三项是 Composition API 的核心价值：逻辑内聚、类型友好、可组合复用。\n\n第四项是常见误解——性能提升主要来自 Vue3 的响应式重写（Proxy）与编译优化，与用哪种 API 写法无关。同规模下两种写法的运行时开销基本一致。',
+  },
+  {
+    id: 'q-vue-014',
+    type: 'single',
+    subject: 'vue',
+    difficulty: 2,
+    tags: ['vue-core'],
+    title: '给自定义组件写 `<Child v-model="msg" />`，组件内部需要声明的 props 与事件是？',
+    options: [
+      '`value` 与 `input`',
+      '`modelValue` 与 `update:modelValue`',
+      '`msg` 与 `change`',
+      '`v-model` 只能用于表单元素，不能用于组件',
+    ],
+    answer: [1],
+    analysis:
+      'Vue3 把 `v-model` 展开成 `:modelValue` 加 `@update:modelValue`，组件里写成 props 接收、`emit("update:modelValue", v)` 回传即可。\n\n支持具名双向绑定：`v-model:title` 对应 `title` 与 `update:title`，一个组件可以同时有多个 v-model。`value / input` 是 Vue2 的约定。',
   },
 
   // ============ 浏览器 3 ============
