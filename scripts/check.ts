@@ -16,6 +16,7 @@ import { analyzeStage, pickProgressive } from '../src/lib/pick'
 import { renderMarkdown } from '../src/lib/md'
 import { useBankStore } from '../src/stores/bank'
 import { useProgressStore } from '../src/stores/progress'
+import { mergeCustom, mergeProgress } from '../src/lib/sync'
 import { DAY } from '../src/lib/dates'
 
 let failed = 0
@@ -34,7 +35,7 @@ setActivePinia(createPinia())
 console.log('\n[1] 样张题库配比')
 const bank = useBankStore()
 const qs = bank.questions
-check('总题量 70', qs.length === 70, `实际 ${qs.length}`)
+check('总题量 120', qs.length === 120, `实际 ${qs.length}`)
 
 const bySubject: Record<string, number> = {}
 const byType: Record<string, number> = {}
@@ -43,18 +44,18 @@ for (const q of qs) {
   byType[q.type] = (byType[q.type] ?? 0) + 1
 }
 const basic = qs.filter((q) => ['single', 'multi', 'judge'].includes(q.type))
-check('基础题 50', basic.length === 50, `实际 ${basic.length}`)
-check('简答 10', (byType.short ?? 0) === 10, `实际 ${byType.short ?? 0}`)
-check('手撕 10', (byType.code ?? 0) === 10, `实际 ${byType.code ?? 0}`)
+check('基础题 70', basic.length === 70, `实际 ${basic.length}`)
+check('简答 30', (byType.short ?? 0) === 30, `实际 ${byType.short ?? 0}`)
+check('手撕 20', (byType.code ?? 0) === 20, `实际 ${byType.code ?? 0}`)
 
-for (const [s, n] of Object.entries({ js: 18, css: 12, vue: 14, browser: 3, network: 3 })) {
+for (const [s, n] of Object.entries({ js: 18, css: 12, vue: 14, browser: 10, network: 10, os: 3, db: 3 })) {
   const actual = basic.filter((q) => q.subject === s).length
   check(`基础 · ${s} ${n} 题`, actual === n, `实际 ${actual}`)
 }
 const algoCode = qs.filter((q) => q.type === 'code' && q.subject === 'algo').length
 const jsCode = qs.filter((q) => q.type === 'code' && q.subject === 'js').length
-check('手撕 · 算法 6', algoCode === 6, `实际 ${algoCode}`)
-check('手撕 · JS 手写 4', jsCode === 4, `实际 ${jsCode}`)
+check('手撕 · 算法 12', algoCode === 12, `实际 ${algoCode}`)
+check('手撕 · JS 手写 8', jsCode === 8, `实际 ${jsCode}`)
 
 const ids = new Set(qs.map((q) => q.id))
 check('题目 id 唯一', ids.size === qs.length)
@@ -119,6 +120,20 @@ check('可还原内置原题', bank.byId['q-js-001'].title === original)
 
 const bad = validateQuestionList([{ id: '', type: 'single', subject: 'js' }])
 check('非法题目被拒绝', bad.ok === false && bad.errors.length > 0)
+
+const addOk = bank.addQuestion({
+  id: 'q-custom-check',
+  type: 'judge',
+  subject: 'os',
+  difficulty: 1,
+  tags: [],
+  title: 't',
+  answer: true,
+  analysis: 'a',
+})
+check('手动加题成功', addOk.ok && bank.byId['q-custom-check']?.type === 'judge')
+check('重复 id 被拒绝', bank.addQuestion(bank.byId['q-custom-check']).ok === false)
+bank.removeCustom('q-custom-check')
 
 const good = validateQuestionList([
   {
@@ -189,7 +204,7 @@ check('中等题池统计正确', mediumIds.length > 0)
 // ---------- 6. 手撕参考答案的注释 ----------
 console.log('\n[6] 手撕参考答案注释')
 const codeQs = all.filter((q) => q.type === 'code')
-check('手撕题共 10 道', codeQs.length === 10, `实际 ${codeQs.length}`)
+check('手撕题共 20 道', codeQs.length === 20, `实际 ${codeQs.length}`)
 for (const q of codeQs) {
   const comments = (q.analysis.match(/\/\/ /g) ?? []).length
   check(`${q.id} 含关键注释`, comments >= 3, `注释 ${comments} 处`)
@@ -201,6 +216,44 @@ check(
 const levelCount = { 1: 0, 2: 0, 3: 0 }
 for (const q of all) levelCount[q.difficulty] += 1
 check('简单题够撑起第一阶段', levelCount[1] >= 8, `简单 ${levelCount[1]} 题`)
+
+// ---------- 7. WebDAV 同步合并（LWW） ----------
+console.log('\n[7] 同步合并')
+const NOW2 = Date.now()
+const merged = mergeProgress(
+  {
+    records: [
+      { qid: 'a', ts: 100, correct: true, self: false },
+      { qid: 'b', ts: 200, correct: false, self: false },
+    ],
+    review: { x: { qid: 'x', stage: 2, dueAt: NOW2 + 9000, addedAt: 1 } },
+    meta: { stars: { a: 300 }, notes: { a: 'local' } },
+    checkins: { '2026-11-06': 500 },
+  },
+  {
+    records: [
+      { qid: 'b', ts: 200, correct: false, self: false }, // 重复
+      { qid: 'c', ts: 300, correct: true, self: true },
+    ],
+    review: { x: { qid: 'x', stage: 0, dueAt: NOW2 + 1000, addedAt: 1 }, y: { qid: 'y', stage: 0, dueAt: 1, addedAt: 1 } },
+    meta: { stars: { a: 100, b: 200 }, notes: { a: 'remote', c: 'remote' } },
+    checkins: { '2026-11-06': 400, '2026-11-05': 300 },
+  },
+)
+check('记录并集去重', merged.records.length === 3 && merged.records.map((r) => r.qid).join('') === 'abc')
+check('复习项取活动时间较新者', merged.review.x.stage === 2 && Boolean(merged.review.y))
+check('星标逐键取大时间戳', merged.meta.stars.a === 300 && merged.meta.stars.b === 200)
+check('打卡逐日取大时间戳', merged.checkins['2026-11-06'] === 500 && merged.checkins['2026-11-05'] === 300)
+check('笔记本地优先、远端补缺', merged.meta.notes.a === 'local' && merged.meta.notes.c === 'remote')
+
+const mergedCustom = mergeCustom(
+  [{ id: 'q1', title: 'local' } as never],
+  [{ id: 'q1', title: 'remote' } as never, { id: 'q2', title: 'r2' } as never],
+)
+check(
+  '自定义题按 id 并集、本地优先',
+  mergedCustom.length === 2 && mergedCustom.find((q) => q.id === 'q1')?.title === 'local',
+)
 
 console.log(failed === 0 ? '\n全部通过\n' : `\n${failed} 项失败\n`)
 process.exit(failed === 0 ? 0 : 1)

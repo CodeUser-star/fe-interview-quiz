@@ -8,7 +8,8 @@ export default defineConfig({
   plugins: [
     vue(),
     VitePWA({
-      registerType: 'autoUpdate',
+      // prompt：新版本就绪后交给用户确认刷新（App 内 banner），避免做题途中被强刷
+      registerType: 'prompt',
       includeAssets: ['favicon.svg', 'icons/icon-192.png', 'icons/icon-512.png'],
       manifest: {
         name: '前端面试刷题',

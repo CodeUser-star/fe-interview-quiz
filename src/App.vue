@@ -7,6 +7,7 @@ import ToastHost from './components/ToastHost.vue'
 import { useSettingsStore } from './stores/settings'
 import { useProgressStore } from './stores/progress'
 import { storageError } from './lib/storage'
+import { needRefresh, updateSW } from './lib/pwa'
 import { toast } from './lib/toast'
 
 const route = useRoute()
@@ -95,6 +96,13 @@ watch(
     </nav>
 
     <main class="main">
+      <div v-if="needRefresh" class="page" style="padding-bottom: 0">
+        <div class="banner ok" style="display: flex; align-items: center; gap: 10px">
+          发现新版本，刷新后生效
+          <button class="btn btn-sm" style="margin-left: auto" @click="updateSW(true)">刷新</button>
+          <button class="btn btn-sm btn-ghost" @click="needRefresh = false">稍后</button>
+        </div>
+      </div>
       <div v-if="storageError" class="page" style="padding-bottom: 0">
         <div class="banner">{{ storageError }}</div>
       </div>

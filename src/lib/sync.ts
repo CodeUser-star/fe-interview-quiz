@@ -1,0 +1,235 @@
+import { ref, watch } from 'vue'
+import type { AnswerRecord, Checkins, Meta, Question, ReviewItem } from '../types'
+import { useBankStore } from '../stores/bank'
+import { useProgressStore } from '../stores/progress'
+import { useSettingsStore } from '../stores/settings'
+
+/**
+ * WebDAV 同步（坚果云）
+ * - 打开应用时拉取一次，本地变动后防抖推送
+ * - 记录级 last-write-wins 合并：作答记录按 (qid, ts) 求并集，复习项/星标/打卡按各自时间戳取新
+ * - 统计全部由合并后的 records 重算，不做数值合并
+ * - 失败静默重试，绝不影响本地数据
+ */
+
+export interface SyncProgressPayload {
+  records?: AnswerRecord[]
+  review?: Record<string, ReviewItem>
+  meta?: Meta
+  checkins?: Checkins
+}
+
+export interface SyncPayload {
+  app: 'fe-interview-quiz'
+  version: 1
+  updatedAt: number
+  bank: { edits: Record<string, Partial<Question>>; custom: Question[] }
+  progress: SyncProgressPayload
+}
+
+export type SyncStatus = 'off' | 'idle' | 'syncing' | 'ok' | 'error'
+
+export const syncStatus = ref<SyncStatus>('off')
+export const lastSyncAt = ref(0)
+export const lastError = ref('')
+
+const FILE_DIR = 'fe-interview-quiz'
+const FILE_NAME = 'backup.json'
+const PUSH_DEBOUNCE = 3000
+const RETRY_DELAY = 30_000
+
+let applying = false // 正在写入合并结果，避免触发推送循环
+let pushTimer: ReturnType<typeof setTimeout> | null = null
+let retryTimer: ReturnType<typeof setTimeout> | null = null
+
+// ---------- 合并（纯函数，可测试） ----------
+
+function recordKey(r: AnswerRecord): string {
+  return `${r.qid}|${r.ts}|${r.correct ? 1 : 0}`
+}
+
+function reviewActivity(item: ReviewItem): number {
+  return Math.max(item.dueAt, item.addedAt)
+}
+
+/** 记录级 LWW 合并本地与远端的进度数据 */
+export function mergeProgress(
+  local: SyncProgressPayload,
+  remote: SyncProgressPayload,
+): Required<SyncProgressPayload> {
+  // 作答记录：按 (qid, ts, correct) 去重求并集，按时间排序
+  const seen = new Set<string>()
+  const records: AnswerRecord[] = []
+  for (const r of [...(remote.records ?? []), ...(local.records ?? [])]) {
+    const k = recordKey(r)
+    if (seen.has(k)) continue
+    seen.add(k)
+    records.push(r)
+  }
+  records.sort((a, b) => a.ts - b.ts)
+
+  // 复习队列：同 qid 取活动时间较新的一项
+  const review: Record<string, ReviewItem> = { ...(remote.review ?? {}) }
+  for (const [qid, item] of Object.entries(local.review ?? {})) {
+    const old = review[qid]
+    if (!old || reviewActivity(item) >= reviewActivity(old)) review[qid] = item
+  }
+
+  // 星标 / 打卡：值即时间戳，逐键取大者
+  const stars: Record<string, number> = { ...(remote.meta?.stars ?? {}) }
+  for (const [qid, ts] of Object.entries(local.meta?.stars ?? {})) {
+    if (!stars[qid] || ts > stars[qid]) stars[qid] = ts
+  }
+  const checkins: Checkins = { ...(remote.checkins ?? {}) }
+  for (const [day, ts] of Object.entries(local.checkins ?? {})) {
+    if (!checkins[day] || ts > checkins[day]) checkins[day] = ts
+  }
+
+  // 笔记无时间戳：本地优先（本地刚编辑过），本地没有才用远端
+  const notes: Record<string, string> = { ...(remote.meta?.notes ?? {}) }
+  for (const [qid, text] of Object.entries(local.meta?.notes ?? {})) notes[qid] = text
+
+  return { records, review, meta: { stars, notes }, checkins }
+}
+
+/** 自定义题按 id 求并集，冲突时本地优先（本地是最近编辑方） */
+export function mergeCustom(local: Question[], remote: Question[]): Question[] {
+  const map = new Map<string, Question>()
+  for (const q of remote) map.set(q.id, q)
+  for (const q of local) map.set(q.id, q)
+  return [...map.values()]
+}
+
+// ---------- WebDAV 传输 ----------
+
+function endpoint(url: string): { fileUrl: string; dirUrl: string } {
+  return { fileUrl: `${url}/${FILE_DIR}/${FILE_NAME}`, dirUrl: `${url}/${FILE_DIR}` }
+}
+
+function authHeader(user: string, pass: string): string {
+  return `Basic ${btoa(`${user}:${pass}`)}`
+}
+
+async function ensureDir(dirUrl: string, auth: string): Promise<void> {
+  await fetch(dirUrl, { method: 'MKCOL', headers: { Authorization: auth } }).catch(() => {})
+  // 已存在返回 405，属正常，忽略
+}
+
+async function remoteGet(fileUrl: string, auth: string): Promise<SyncPayload | null> {
+  const res = await fetch(fileUrl, { headers: { Authorization: auth } })
+  if (res.status === 404) return null
+  if (!res.ok) throw new Error(`GET ${res.status}`)
+  return (await res.json()) as SyncPayload
+}
+
+async function remotePut(fileUrl: string, auth: string, payload: SyncPayload): Promise<void> {
+  const res = await fetch(fileUrl, {
+    method: 'PUT',
+    headers: { Authorization: auth, 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  })
+  if (!res.ok) throw new Error(`PUT ${res.status}`)
+}
+
+// ---------- 编排 ----------
+
+function localPayload(): SyncPayload {
+  const bank = useBankStore()
+  const progress = useProgressStore()
+  return {
+    app: 'fe-interview-quiz',
+    version: 1,
+    updatedAt: Date.now(),
+    bank: { edits: bank.edits, custom: bank.custom },
+    progress: progress.exportPayload(),
+  }
+}
+
+function configured(): { url: string; auth: string } | null {
+  const settings = useSettingsStore()
+  if (!settings.syncUrl || !settings.syncUser) return null
+  return { url: settings.syncUrl, auth: authHeader(settings.syncUser, settings.syncPass) }
+}
+
+/** 完整同步：拉远端 → 合并写回本地 → 把合并结果推回远端 */
+export async function syncNow(): Promise<boolean> {
+  const cfg = configured()
+  if (!cfg) {
+    syncStatus.value = 'off'
+    return false
+  }
+  const { fileUrl, dirUrl } = endpoint(cfg.url)
+  syncStatus.value = 'syncing'
+  try {
+    await ensureDir(dirUrl, cfg.auth)
+    const remote = await remoteGet(fileUrl, cfg.auth)
+    if (remote && remote.app === 'fe-interview-quiz') {
+      const bank = useBankStore()
+      const progress = useProgressStore()
+      const merged = mergeProgress(progress.exportPayload(), remote.progress ?? {})
+      applying = true
+      try {
+        progress.importPayload(merged)
+        bank.custom = mergeCustom(bank.custom, remote.bank?.custom ?? [])
+        // 内置题改动：远端有而本地没有的改动补进来，冲突保留本地
+        for (const [id, patch] of Object.entries(remote.bank?.edits ?? {})) {
+          if (!bank.edits[id]) bank.edits = { ...bank.edits, [id]: patch }
+        }
+      } finally {
+        applying = false
+      }
+    }
+    await remotePut(fileUrl, cfg.auth, localPayload())
+    syncStatus.value = 'ok'
+    lastSyncAt.value = Date.now()
+    lastError.value = ''
+    return true
+  } catch (e) {
+    syncStatus.value = 'error'
+    lastError.value = e instanceof Error ? e.message : String(e)
+    console.warn('[sync]', e)
+    scheduleRetry()
+    return false
+  }
+}
+
+/** 防抖推送：本地变动后 3 秒同步一次 */
+export function schedulePush(): void {
+  if (applying || !configured()) return
+  if (pushTimer) clearTimeout(pushTimer)
+  pushTimer = setTimeout(() => {
+    pushTimer = null
+    void syncNow()
+  }, PUSH_DEBOUNCE)
+}
+
+function scheduleRetry(): void {
+  if (retryTimer) return
+  retryTimer = setTimeout(() => {
+    retryTimer = null
+    void syncNow()
+  }, RETRY_DELAY)
+}
+
+/** 启动同步：拉取一次 + 监听所有数据变动自动推送。可重复调用（幂等） */
+let started = false
+export function setupSync(): void {
+  const settings = useSettingsStore()
+  if (!settings.syncUrl || started) return
+  started = true
+  const bank = useBankStore()
+  const progress = useProgressStore()
+  watch(
+    [
+      () => progress.records,
+      () => progress.review,
+      () => progress.meta,
+      () => progress.checkins,
+      () => bank.edits,
+      () => bank.custom,
+    ],
+    () => schedulePush(),
+    { deep: true },
+  )
+  void syncNow()
+}

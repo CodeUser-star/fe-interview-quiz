@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import type { Question, ThemeMode } from '../types'
 import { SUBJECT_NAME, TYPE_NAME } from '../types'
 import { plain } from '../lib/text'
@@ -7,14 +7,18 @@ import { useBankStore } from '../stores/bank'
 import { useSettingsStore } from '../stores/settings'
 import { useProgressStore } from '../stores/progress'
 import { validateQuestionList } from '../lib/validate'
+import { lastError, lastSyncAt, setupSync, syncNow, syncStatus } from '../lib/sync'
+import { toast } from '../lib/toast'
 import AppIcon from '../components/AppIcon.vue'
 import EditQuestionDialog from '../components/EditQuestionDialog.vue'
+import AddQuestionDialog from '../components/AddQuestionDialog.vue'
 
 const bank = useBankStore()
 const settings = useSettingsStore()
 const progress = useProgressStore()
 
 const editing = ref<Question | null>(null)
+const adding = ref(false)
 const message = ref('')
 const messageKind = ref<'ok' | 'bad'>('ok')
 
@@ -126,6 +130,44 @@ function downloadTemplate(): void {
 function remove(q: Question): void {
   if (!window.confirm(`删除自定义题「${q.id}」？`)) return
   bank.removeCustom(q.id)
+}
+
+// ---------- WebDAV 同步 ----------
+const syncUrlInput = ref(settings.syncUrl)
+const syncUserInput = ref(settings.syncUser)
+const syncPassInput = ref(settings.syncPass)
+
+const syncStatusText = computed(() => {
+  if (!settings.syncUrl) return '未配置'
+  return { off: '未配置', idle: '待同步', syncing: '同步中…', ok: '已同步', error: '同步失败，稍后自动重试' }[
+    syncStatus.value
+  ]
+})
+
+const syncPillStyle = computed(() => ({
+  color:
+    syncStatus.value === 'error'
+      ? 'var(--bad)'
+      : syncStatus.value === 'ok'
+        ? 'var(--ok)'
+        : 'var(--fg-3)',
+  background: 'var(--surface-3)',
+}))
+
+const lastSyncText = computed(() =>
+  lastSyncAt.value ? `上次同步 ${new Date(lastSyncAt.value).toLocaleString()}` : '尚未同步过',
+)
+
+function saveSync(): void {
+  settings.setSync(syncUrlInput.value, syncUserInput.value, syncPassInput.value)
+  setupSync() // 首次配置后立即启动自动同步
+  toast('同步配置已保存')
+}
+
+async function runSync(): Promise<void> {
+  saveSync()
+  const ok = await syncNow()
+  toast(ok ? '同步完成' : '同步失败，将自动重试', ok ? 'ok' : 'bad')
 }
 </script>
 
@@ -240,7 +282,13 @@ function remove(q: Question): void {
               {{ bank.custom.length }} 题
             </span>
           </div>
-          <span class="muted">共 {{ bank.questions.length }}</span>
+          <div class="btn-row">
+            <span class="muted">共 {{ bank.questions.length }}</span>
+            <button class="btn btn-sm" @click="adding = true">
+              <AppIcon name="edit" :size="13" />
+              手动加题
+            </button>
+          </div>
         </div>
       </div>
 
@@ -264,19 +312,59 @@ function remove(q: Question): void {
       </div>
 
       <p class="muted" style="margin: 10px 0 0">
-        任何题目（含内置题）都可以在题库页点开编辑，修改题干 / 答案 / 解析。应用内手动加题表单在阶段二提供。
+        任何题目（含内置题）都可以在题库页点开编辑，修改题干 / 答案 / 解析。
       </p>
     </div>
 
     <div class="setting-group">
       <h3 class="section-title" style="margin-bottom: 10px">同步</h3>
       <div class="card">
-        <div class="setting-row" style="border-bottom: 0; padding-bottom: 0">
+        <div class="setting-row">
           <div class="setting-label">
             <b>坚果云 WebDAV</b>
-            <span>阶段二提供。当前数据全部保存在本机 localStorage，离线可用。</span>
+            <span>打开应用自动拉取，本地变动后自动推送；失败静默重试</span>
           </div>
-          <span class="pill" style="color: var(--fg-3); background: var(--surface-3)">阶段二</span>
+          <span class="pill" :style="syncPillStyle">{{ syncStatusText }}</span>
+        </div>
+        <div class="setting-row">
+          <div class="setting-label">
+            <b>服务器地址</b>
+            <span>坚果云为 https://dav.jianguoyun.com/dav</span>
+          </div>
+          <input
+            v-model="syncUrlInput"
+            class="num-input"
+            style="width: 240px"
+            placeholder="https://dav.jianguoyun.com/dav"
+          />
+        </div>
+        <div class="setting-row">
+          <div class="setting-label">
+            <b>账号 / 应用密码</b>
+            <span>坚果云「安全选项 → 第三方应用管理」生成应用密码；明文存本机，仅自用</span>
+          </div>
+          <div class="btn-row">
+            <input v-model="syncUserInput" class="num-input" style="width: 140px" placeholder="邮箱" />
+            <input
+              v-model="syncPassInput"
+              class="num-input"
+              style="width: 140px"
+              type="password"
+              placeholder="应用密码"
+            />
+          </div>
+        </div>
+        <div class="setting-row" style="border-bottom: 0; padding-bottom: 0">
+          <div class="setting-label">
+            <b>{{ lastSyncText }}</b>
+            <span v-if="lastError" style="color: var(--bad)">{{ lastError }}</span>
+          </div>
+          <div class="btn-row">
+            <button class="btn btn-sm btn-ghost" @click="saveSync">保存配置</button>
+            <button class="btn btn-sm" :disabled="syncStatus === 'syncing'" @click="runSync">
+              立即同步
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -294,5 +382,6 @@ function remove(q: Question): void {
     </div>
 
     <EditQuestionDialog :question="editing" @close="editing = null" />
+    <AddQuestionDialog :open="adding" @close="adding = false" />
   </div>
 </template>

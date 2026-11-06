@@ -64,12 +64,19 @@ export interface Settings {
   theme: ThemeMode
   /** 打卡所需的当日答题数 */
   dailyGoal: number
+  /** WebDAV 同步配置（密码明文存本机 localStorage，仅自用） */
+  syncUrl: string
+  syncUser: string
+  syncPass: string
 }
 
 export interface Meta {
   stars: Record<string, number>
   notes: Record<string, string>
 }
+
+/** 打卡记录：日期串 → 时间戳 */
+export type Checkins = Record<string, number>
 
 export const SUBJECTS: { key: Subject; name: string }[] = [
   { key: 'js', name: 'JavaScript' },

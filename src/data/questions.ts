@@ -2,11 +2,10 @@ import type { Question } from '../types'
 import { codeBlock } from '../lib/md'
 
 /**
- * 内置题库（阶段二建设中，当前 70 题）
- * 基础 50：JS 18 / CSS 12 / Vue 14 / 浏览器 3 / 计网 3
- * 简答 10（八股）
- * 手撕 10：算法 6 / JS 手写 4
- * 目标 120：基础 70 / 八股 30 / 手撕 20
+ * 内置题库（120 题）
+ * 基础 70：JS 18 / CSS 12 / Vue 14 / 浏览器 10 / 计网 10 / OS 3 / DB 3
+ * 简答 30（八股）
+ * 手撕 20：算法 12 / JS 手写 8
  */
 export const SEED_QUESTIONS: Question[] = [
   // ============ JavaScript 18 ============
@@ -1286,5 +1285,996 @@ const p = new Person('Tom')`,
 }`,
     )}\n\n为什么用 WeakMap：不阻止垃圾回收；为什么用 \`Reflect.ownKeys\`：可以带上 Symbol 键与非枚举属性。生产环境优先用 \`structuredClone\`。`,
     complexity: '时间 O(n) / 空间 O(n)',
+  },
+
+  // ============ 浏览器 +7 ============
+  {
+    id: 'q-browser-004',
+    type: 'single',
+    subject: 'browser',
+    difficulty: 1,
+    tags: ['browser-core', 'must-know'],
+    title: '浏览器渲染页面的正确顺序是？',
+    options: [
+      '解析 HTML 构建 DOM → 解析 CSS 构建 CSSOM → 合成 Render Tree → Layout → Paint → Composite',
+      '解析 CSS → 解析 HTML → Paint → Layout',
+      '解析 HTML → Layout → 解析 CSS → Paint',
+      '构建 DOM → Paint → Layout → 构建 CSSOM',
+    ],
+    answer: [0],
+    analysis:
+      'HTML 解析为 DOM、CSS 解析为 CSSOM，二者合成 Render Tree（不含 `display:none`），再做 Layout（算几何）→ Paint（栅格化）→ Composite（合成层上屏）。JS 脚本会阻塞 DOM 解析（遇到同步 `<script>`）。',
+  },
+  {
+    id: 'q-browser-005',
+    type: 'single',
+    subject: 'browser',
+    difficulty: 2,
+    tags: ['browser-core', 'nowcoder-hot'],
+    title: '关于回流（reflow）与重绘（repaint），下列说法正确的是？',
+    options: [
+      '重绘一定触发回流',
+      '回流一定触发重绘，重绘不一定触发回流',
+      '二者互不相干',
+      '修改 background-color 会触发回流',
+    ],
+    answer: [1],
+    analysis:
+      '回流是几何属性（宽高/位置）变化导致重新 Layout，代价高，且必然带来重绘；重绘只是外观（颜色等）变化，不重新布局。`transform` / `opacity` 走合成层，二者都不触发，是动画首选。',
+  },
+  {
+    id: 'q-browser-006',
+    type: 'judge',
+    subject: 'browser',
+    difficulty: 1,
+    tags: ['browser-core'],
+    title: '`<script defer>` 与 `<script async>` 都不阻塞 HTML 解析，但 defer 保证按声明顺序执行，async 不保证。',
+    answer: true,
+    analysis:
+      'defer：并行下载，DOM 解析完成后按顺序执行，DOMContentLoaded 之前；async：并行下载，下载完立即执行（阻塞解析），顺序不定，适合无依赖的统计脚本。',
+  },
+  {
+    id: 'q-browser-007',
+    type: 'multi',
+    subject: 'browser',
+    difficulty: 2,
+    tags: ['browser-core', 'nowcoder-hot'],
+    title: '关于本地存储方案，下列说法正确的有？',
+    options: [
+      'localStorage 持久保存，同源共享，约 5MB',
+      'sessionStorage 仅在当前标签页会话内有效',
+      'cookie 每次请求都会自动携带到服务端',
+      'IndexedDB 是同步 API，适合存小数据',
+    ],
+    answer: [0, 1, 2],
+    analysis:
+      'IndexedDB 是**异步**的事务型 NoSQL 数据库，适合存大结构数据，D 错。cookie 会自动随请求发送（受 SameSite 约束），容量仅约 4KB；localStorage 同源共享、sessionStorage 限当前标签页。',
+  },
+  {
+    id: 'q-browser-008',
+    type: 'single',
+    subject: 'browser',
+    difficulty: 2,
+    tags: ['browser-core', 'bytedance-r1'],
+    title: '事件循环中，一个宏任务执行完后接下来会发生什么？',
+    options: [
+      '直接执行下一个宏任务',
+      '清空当前所有微任务，必要时进行渲染，再执行下一个宏任务',
+      '先执行所有 setTimeout 回调',
+      '随机选择任务执行',
+    ],
+    answer: [1],
+    analysis:
+      '每轮：执行一个宏任务 → 清空微任务队列（Promise.then / MutationObserver / queueMicrotask）→ 浏览器择机渲染 → 下一宏任务。所以微任务总是在渲染前执行完。',
+  },
+  {
+    id: 'q-browser-009',
+    type: 'single',
+    subject: 'browser',
+    difficulty: 3,
+    tags: ['browser-core', 'bytedance-r2'],
+    title: '关于 CORS 预检请求（preflight），下列说法正确的是？',
+    options: [
+      '所有跨域请求都会先发 OPTIONS 预检',
+      '预检由浏览器自动发起，服务端需在响应头中允许对应方法与自定义头',
+      '预检请求会携带请求 body',
+      '只要服务端返回 200 就能通过预检',
+    ],
+    answer: [1],
+    analysis:
+      '只有「非简单请求」（如 PUT/DELETE、自定义头、Content-Type 为 application/json）才触发预检；预检是浏览器自动发的 OPTIONS，**不带 body**；服务端必须返回正确的 `Access-Control-Allow-*` 头，仅 200 不够。可用 `Access-Control-Max-Age` 缓存预检结果。',
+  },
+  {
+    id: 'q-browser-010',
+    type: 'judge',
+    subject: 'browser',
+    difficulty: 2,
+    tags: ['browser-core', 'must-know'],
+    title: '强缓存命中时浏览器不发请求；协商缓存命中（304）时需要发请求但不传输 body。',
+    answer: true,
+    analysis:
+      '强缓存由 `Cache-Control: max-age` / `Expires` 控制，命中直接用本地副本（200 from disk/memory cache）；过期后走协商缓存：带 `If-None-Match`（ETag）/ `If-Modified-Since` 询问，未变则回 304，省流量。',
+  },
+
+  // ============ 计网 +7 ============
+  {
+    id: 'q-network-004',
+    type: 'single',
+    subject: 'network',
+    difficulty: 1,
+    tags: ['network-core', 'must-know'],
+    title: 'HTTP 状态码 301 与 302 的区别是？',
+    options: [
+      '301 永久重定向，302 临时重定向',
+      '301 临时重定向，302 永久重定向',
+      '二者完全相同',
+      '301 用于缓存，302 用于鉴权',
+    ],
+    answer: [0],
+    analysis:
+      '301 永久重定向：搜索引擎会转移权重，浏览器可能缓存该跳转；302 临时重定向：每次仍请求原地址。相关还有 304（协商缓存命中）与 307/308（更严格的重定向，保持方法与 body）。',
+  },
+  {
+    id: 'q-network-005',
+    type: 'single',
+    subject: 'network',
+    difficulty: 2,
+    tags: ['network-core', 'nowcoder-hot'],
+    title: 'TCP 三次握手为什么不能用两次？',
+    options: [
+      '两次握手速度太慢',
+      '无法防止历史失效的连接请求到达服务端，造成资源浪费，且无法同步双方初始序列号',
+      '协议规定必须三次，没有原因',
+      '两次握手无法加密',
+    ],
+    answer: [1],
+    analysis:
+      '三次握手的核心：同步双方 ISN（初始序列号）并确认双方收发能力正常。若只有两次，客户端旧 SYN 延迟到达会让服务端白等一个已不存在的连接。简记：客户端知道「我发你收正常」，服务端也需要知道「你发我收正常」。',
+  },
+  {
+    id: 'q-network-006',
+    type: 'multi',
+    subject: 'network',
+    difficulty: 2,
+    tags: ['network-core', 'must-know'],
+    title: '关于 HTTPS，下列说法正确的有？',
+    options: [
+      '使用非对称加密交换会话密钥，之后用对称加密传输数据',
+      '证书用于验证服务端身份，由 CA 签发',
+      'HTTPS 完全无法被中间人攻击，无需校验证书',
+      'TLS 握手发生在 TCP 握手之后',
+    ],
+    answer: [0, 1, 3],
+    analysis:
+      'HTTPS = HTTP over TLS：TCP 握手 → TLS 握手（验证证书、协商出对称会话密钥）→ 加密传输。混合加密兼顾安全与性能。若不校验/信任伪造证书，仍可能被中间人攻击，C 错。',
+  },
+  {
+    id: 'q-network-007',
+    type: 'judge',
+    subject: 'network',
+    difficulty: 1,
+    tags: ['network-core'],
+    title: 'HTTP/2 通过多路复用解决了应用层的队头阻塞，但 TCP 层的队头阻塞依然存在。',
+    answer: true,
+    analysis:
+      'HTTP/2 把请求/响应拆成帧在同一个 TCP 连接上交错传输（多路复用），不再需要浏览器开 6 个并发连接；但丢包时 TCP 仍需按序交付，后面所有流都被卡住。HTTP/3 改用 QUIC（UDP）才解决传输层队头阻塞。',
+  },
+  {
+    id: 'q-network-008',
+    type: 'single',
+    subject: 'network',
+    difficulty: 2,
+    tags: ['network-core', 'nowcoder-hot'],
+    title: '关于 GET 与 POST，下列说法**错误**的是？',
+    options: [
+      'GET 参数在 URL 中，适合幂等的查询',
+      'POST 语义上用于提交/创建，参数在 body 中',
+      'GET 比 POST 更安全',
+      'GET 会被浏览器主动缓存，POST 默认不会',
+    ],
+    answer: [2],
+    analysis:
+      '明文 HTTP 下二者都不安全，HTTPS 才是正道，C 错。语义差异：GET 幂等可缓存、长度受 URL 限制；POST 非幂等、body 承载数据。注意「GET 不能带 body」并非协议强制，只是惯例与实现差异。',
+  },
+  {
+    id: 'q-network-009',
+    type: 'single',
+    subject: 'network',
+    difficulty: 3,
+    tags: ['network-core', 'bytedance-r2'],
+    title: 'TCP 四次挥手中，主动关闭方最后进入 TIME_WAIT 状态，其等待时长与作用是？',
+    options: [
+      '等待 2MSL，确保最后一个 ACK 能到达对方，并让旧连接的报文在网络中消亡',
+      '等待 1MSL，为了节省资源',
+      '不等待，直接关闭',
+      '等待 30 秒固定时长',
+    ],
+    answer: [0],
+    analysis:
+      'TIME_WAIT = 2MSL（最大报文生存时间的 2 倍）：①若最后的 ACK 丢失，还有时间重发 FIN 给对方重传；②让本连接的旧报文全部过期，避免污染下一个相同四元组的连接。高并发短连接下大量 TIME_WAIT 是常见性能问题。',
+  },
+  {
+    id: 'q-network-010',
+    type: 'judge',
+    subject: 'network',
+    difficulty: 2,
+    tags: ['network-core'],
+    title: 'DNS 解析一般按「浏览器缓存 → 系统缓存（hosts）→ 本地 DNS 服务器 → 根/顶级/权威服务器」的顺序进行，且默认使用 UDP 53 端口。',
+    answer: true,
+    analysis:
+      '递归查询（客户端→本地 DNS）+ 迭代查询（本地 DNS→根→顶级域→权威）。默认 UDP 53，报文过大或区域传送时用 TCP。CDN 正是利用 DNS 解析返回离用户最近的节点 IP。',
+  },
+
+  // ============ 操作系统 +3 ============
+  {
+    id: 'q-os-001',
+    type: 'single',
+    subject: 'os',
+    difficulty: 1,
+    tags: ['must-know'],
+    title: '进程与线程最核心的区别是？',
+    options: [
+      '进程是资源分配的最小单位，线程是 CPU 调度的最小单位',
+      '线程比进程占用内存更多',
+      '进程之间可以直接共享内存',
+      '一个进程只能有一个线程',
+    ],
+    answer: [0],
+    analysis:
+      '进程拥有独立地址空间（资源分配单位），线程共享所属进程的内存与资源（调度单位），因此线程切换开销小、通信方便但互相影响。联系前端：浏览器是多进程架构，JS 引擎是渲染进程里的单线程。',
+  },
+  {
+    id: 'q-os-002',
+    type: 'judge',
+    subject: 'os',
+    difficulty: 2,
+    tags: ['must-know'],
+    title: '死锁产生的四个必要条件是：互斥、占有且等待、不可剥夺、循环等待；只要破坏其中一个即可避免死锁。',
+    answer: true,
+    analysis:
+      '四条件缺一不可：互斥（资源独占）、占有且等待（拿着资源等新资源）、不可剥夺（不能被抢走）、循环等待（形成等待环）。常见解法：资源一次性申请、按序加锁、可剥夺、银行家算法。',
+  },
+  {
+    id: 'q-os-003',
+    type: 'single',
+    subject: 'os',
+    difficulty: 2,
+    tags: ['must-know'],
+    title: '虚拟内存中 LRU 页面置换算法的含义是？',
+    options: [
+      '淘汰最长时间未被访问的页面',
+      '淘汰最先进内存的页面',
+      '淘汰访问次数最少的页面',
+      '随机淘汰一个页面',
+    ],
+    answer: [0],
+    analysis:
+      'LRU（最近最少使用）淘汰最久未访问页，利用时间局部性；FIFO 淘汰最早进入的；LFU 淘汰访问频次最低的。面试常联动：用「哈希表 + 双向链表」手写一个 O(1) 的 LRU 缓存。',
+  },
+
+  // ============ 数据库 +3 ============
+  {
+    id: 'q-db-001',
+    type: 'single',
+    subject: 'db',
+    difficulty: 1,
+    tags: ['must-know'],
+    title: 'MySQL InnoDB 索引底层为什么选 B+ 树而不是二叉树或哈希？',
+    options: [
+      'B+ 树矮胖、磁盘 IO 次数少，叶子节点有序链表天然支持范围查询；哈希不支持范围与排序',
+      'B+ 树实现最简单',
+      '二叉树不支持等值查询',
+      '哈希表查询最慢',
+    ],
+    answer: [0],
+    analysis:
+      'B+ 树非叶子节点只存键不存数据，单节点能容纳更多索引项 → 树高低（3 层可存千万级）→ 磁盘 IO 少；叶子节点双向链表相连，范围查询与排序高效。哈希等值 O(1) 但不支持范围/排序/模糊匹配；二叉树退化成链表时查询变 O(n)。',
+  },
+  {
+    id: 'q-db-002',
+    type: 'single',
+    subject: 'db',
+    difficulty: 2,
+    tags: ['must-know'],
+    title: '事务的 ACID 中，「多个并发事务互不干扰」指的是哪一项？其实现依赖？',
+    options: [
+      '隔离性，依赖锁与 MVCC',
+      '原子性，依赖 undo log',
+      '持久性，依赖 redo log',
+      '一致性，依赖外键',
+    ],
+    answer: [0],
+    analysis:
+      'I（Isolation 隔离性）由锁和 MVCC（多版本并发控制）实现，隔离级别：读未提交 < 读已提交 < 可重复读（InnoDB 默认，MVCC 快照读解决不可重复读，间隙锁缓解幻读）< 串行化。顺带记：原子性靠 undo log，持久性靠 redo log。',
+  },
+  {
+    id: 'q-db-003',
+    type: 'judge',
+    subject: 'db',
+    difficulty: 2,
+    tags: ['must-know'],
+    title: '对索引列使用函数、隐式类型转换、以 `%` 开头的 LIKE、或不满足最左前缀，都可能导致索引失效。',
+    answer: true,
+    analysis:
+      '索引失效常见场景：`WHERE DATE(create_time)=...`（函数）、字符串列用数字查询（隐式转换）、`LIKE "%abc"`（前缀通配）、联合索引跳过最左列、`OR` 连接无索引列。用 `EXPLAIN` 验证执行计划。',
+  },
+
+  // ============ 简答/八股 +20 ============
+  {
+    id: 'q-short-011',
+    type: 'short',
+    subject: 'js',
+    difficulty: 2,
+    tags: ['must-know', 'nowcoder-hot'],
+    title: '什么是闭包？有什么用途？会造成什么问题？',
+    points: [
+      '定义：函数 + 其词法作用域的引用，内层函数能访问外层变量，外层变量不被回收',
+      '用途：数据私有化（模块模式）、柯里化、防抖节流、回调中保存状态',
+      '问题：变量常驻内存，误用导致内存泄漏；循环中共享变量陷阱（var + setTimeout）',
+      '释放：将不再使用的引用置 null',
+    ],
+    analysis:
+      '答题主线「定义 → 用途 → 代价」。闭包让外层函数执行完后其作用域仍被引用，所以变量不释放。经典追问：循环里 `var` 打 5 个 5 的修复（let 块级作用域 / 立即执行函数 / setTimeout 第三参数）。',
+    followups: ['手写一个用闭包实现的计数器', '闭包与垃圾回收的关系？'],
+  },
+  {
+    id: 'q-short-012',
+    type: 'short',
+    subject: 'js',
+    difficulty: 1,
+    tags: ['must-know'],
+    title: '总结 JS 中 this 的指向规则。',
+    points: [
+      '默认绑定：独立调用指向全局（严格模式 undefined）',
+      '隐式绑定：obj.fn() 指向 obj，注意赋值/回调会丢失',
+      '显式绑定：call / apply / bind',
+      'new 绑定：指向新创建的对象',
+      '箭头函数无 this，沿词法作用域捕获外层 this',
+      '优先级：new > 显式 > 隐式 > 默认',
+    ],
+    analysis:
+      '按「绑定规则 + 优先级」作答最清晰。常考陷阱：对象方法赋值给变量后调用变默认绑定；回调（setTimeout、事件）丢失隐式绑定，可用箭头函数或 bind 固定。',
+    followups: ['手写 bind', '箭头函数为什么不能当构造函数？'],
+  },
+  {
+    id: 'q-short-013',
+    type: 'short',
+    subject: 'js',
+    difficulty: 2,
+    tags: ['must-know', 'bytedance-r1'],
+    title: 'Promise 解决了什么问题？核心机制是什么？',
+    points: [
+      '解决回调地狱与信任问题（回调被调多次/不调/吞异常）',
+      '三种状态 pending / fulfilled / rejected，状态不可逆',
+      'then 链式调用：每次返回新 Promise，值穿透、异常冒泡',
+      '微任务调度：回调进微任务队列，在当前宏任务后执行',
+      '静态方法：all / race / allSettled / any',
+    ],
+    analysis:
+      '先讲动机（回调问题），再讲状态机 + 链式 then + 微任务。进阶答手写要点：executor 同步执行、then 需处理返回 Promise 的展平（resolvePromise 递归）。',
+    followups: ['手写 Promise.all', 'Promise 与 async/await 的关系？'],
+  },
+  {
+    id: 'q-short-014',
+    type: 'short',
+    subject: 'js',
+    difficulty: 1,
+    tags: ['nowcoder-hot'],
+    title: '什么是事件委托？为什么用它？',
+    points: [
+      '利用事件冒泡，把监听器绑在父元素上，通过 e.target 判断来源',
+      '好处：减少监听器数量、动态新增子元素无需重新绑定',
+      '注意：e.target 与 e.currentTarget 的区别；closest() 向上匹配',
+      '不适用：不冒泡的事件（focus/blur 需用捕获或 focusin/focusout）',
+    ],
+    analysis:
+      '「冒泡 + target 判断」一句话说清原理，再讲两个收益（性能、动态元素），最后提 currentTarget 区别与 stopPropagation 的影响，完整度就够了。',
+  },
+  {
+    id: 'q-short-015',
+    type: 'short',
+    subject: 'vue',
+    difficulty: 2,
+    tags: ['vue-core', 'must-know'],
+    title: '对比 Vue2 与 Vue3 的响应式原理。',
+    points: [
+      'Vue2：Object.defineProperty 递归劫持 getter/setter，初始化时全量转换',
+      'Vue2 缺陷：无法检测新增/删除属性（需 Vue.set）、数组下标与 length 需 hack',
+      'Vue3：Proxy 代理整个对象，按需代理（访问到才递归），支持新增/删除/数组下标',
+      'Vue3 配套：ref（基本类型包 .value）/ reactive；effect 收集依赖、trigger 触发更新',
+    ],
+    analysis:
+      '答「API 差异 → Vue2 两个缺陷 → Vue3 如何补上」。可延伸：Proxy 代理的是对象本身而非属性，所以天然支持动态增删；Vue3 响应式模块独立为 @vue/reactivity。',
+    followups: ['为什么 ref 需要 .value？', 'Proxy 相比 defineProperty 还有什么优势？'],
+  },
+  {
+    id: 'q-short-016',
+    type: 'short',
+    subject: 'vue',
+    difficulty: 1,
+    tags: ['vue-core'],
+    title: 'Vue 生命周期各阶段分别适合做什么？',
+    points: [
+      'created：数据已响应式、DOM 未挂载 —— 发请求、初始化数据',
+      'mounted：DOM 就绪 —— DOM 操作、初始化第三方库、定时器',
+      'beforeUnmount / unmounted：清理定时器、解绑全局事件、销毁第三方实例',
+      'keep-alive 组件额外有 activated / deactivated',
+    ],
+    analysis:
+      '按「创建 → 挂载 → 更新 → 销毁」串一遍，重点答 created（最早能拿到数据，发请求）与 mounted（最早能操作 DOM），以及销毁阶段必须清理副作用。Vue3 组合式 API 对应 onMounted 等钩子。',
+  },
+  {
+    id: 'q-short-017',
+    type: 'short',
+    subject: 'vue',
+    difficulty: 2,
+    tags: ['vue-core', 'must-know'],
+    title: 'Vue 组件通信有哪些方式？各自适用场景？',
+    points: [
+      '父子：props 下传 / emits 上传（v-model = 语法糖）',
+      '父访子：ref / expose；子访父：$parent（不推荐）',
+      '跨层级：provide / inject',
+      '任意组件：Pinia 状态管理、事件总线（Vue3 推荐 mitt）',
+      'URL / localStorage：跨页面场景',
+    ],
+    analysis:
+      '按「关系远近」分类作答：近（props/emits）、中（provide/inject）、远（Pinia）。追问常考 provide/inject 不是响应式的（需传 ref）以及 Pinia 相比事件总线的可维护性优势。',
+  },
+  {
+    id: 'q-short-018',
+    type: 'short',
+    subject: 'vue',
+    difficulty: 1,
+    tags: ['vue-core'],
+    title: 'v-if 与 v-show 的区别？如何选择？',
+    points: [
+      'v-if 是真正的条件渲染：不满足时不渲染，切换时销毁/重建组件',
+      'v-show 只是切换 CSS display，组件始终渲染',
+      'v-if 有更高切换开销，v-show 有更高初始渲染开销',
+      '频繁切换用 v-show；条件很少变化或重型子树用 v-if；v-if 与 v-for 不要同用（Vue3 中 v-if 优先级更高）',
+    ],
+    analysis:
+      '一句话：v-if 懒销毁、v-show 纯显隐。选择标准：切换频率。补充 key 与 template 包裹的用法即可。',
+  },
+  {
+    id: 'q-short-019',
+    type: 'short',
+    subject: 'vue',
+    difficulty: 2,
+    tags: ['vue-core', 'bytedance-r1'],
+    title: 'nextTick 是什么？为什么需要它？',
+    points: [
+      'Vue 更新 DOM 是异步的：数据变更后组件更新被推入微任务队列批量执行',
+      'nextTick 返回 Promise，回调在 DOM 更新完成后执行',
+      '场景：修改数据后立即操作更新后的 DOM（如获取高度、聚焦输入框）',
+      '底层：优先 Promise.then，降级 MutationObserver / setTimeout',
+    ],
+    analysis:
+      '核心句：「数据变更是同步的，DOM 更新是异步批量的」。好处是合并同一 tick 内的多次变更只渲染一次。答出微任务降级链是加分项。',
+  },
+  {
+    id: 'q-short-020',
+    type: 'short',
+    subject: 'css',
+    difficulty: 2,
+    tags: ['css-layout', 'nowcoder-hot'],
+    title: '什么是 BFC？如何触发？能解决什么问题？',
+    points: [
+      '块级格式化上下文：独立渲染区域，内部布局不受外部影响',
+      '触发：overflow 非 visible、float、position absolute/fixed、display inline-block/flow-root/flex/grid 等',
+      '应用：清除浮动（包含浮动子元素）、阻止 margin 重叠、两栏自适应布局',
+    ],
+    analysis:
+      '定义一句话：「BFC 内部与外部互不影响的独立盒子」。三个经典应用必须脱口而出：高度塌陷、margin 穿透/重叠、自适应两栏。现代写法优先 `display: flow-root` 清除浮动。',
+  },
+  {
+    id: 'q-short-021',
+    type: 'short',
+    subject: 'css',
+    difficulty: 1,
+    tags: ['css-layout', 'must-know'],
+    title: '实现水平垂直居中的方案有哪些？',
+    points: [
+      'Flex：父级 display:flex; justify-content:center; align-items:center（首选）',
+      'Grid：父级 display:grid; place-items:center',
+      '绝对定位 + transform：left/top 50% + translate(-50%,-50%)，不定宽高也可用',
+      '绝对定位 + margin:auto（需定宽高）',
+      'table-cell：vertical-align:middle + text-align:center',
+    ],
+    analysis:
+      '至少给出 Flex / Grid / 定位+transform 三种，并说明各自前提（是否需要固定宽高）。flex/grid 是现代首选，transform 方案兼容不定尺寸。',
+  },
+  {
+    id: 'q-short-022',
+    type: 'short',
+    subject: 'css',
+    difficulty: 1,
+    tags: ['css-layout'],
+    title: '标准盒模型与 IE（怪异）盒模型的区别？',
+    points: [
+      '标准（content-box）：width = 内容宽，padding/border 额外撑大',
+      '怪异（border-box）：width = 内容 + padding + border',
+      '通过 box-sizing 切换，工程上全局用 border-box 更直觉',
+      'margin 永远不计入盒模型宽度',
+    ],
+    analysis:
+      '一句对比 + 一个实践结论（`*{box-sizing:border-box}`）。可补充：flex/grid 子项尺寸计算也受 box-sizing 影响。',
+  },
+  {
+    id: 'q-short-023',
+    type: 'short',
+    subject: 'browser',
+    difficulty: 3,
+    tags: ['browser-core', 'must-know', 'bytedance-r1'],
+    title: '从输入 URL 到页面展示，中间发生了什么？',
+    points: [
+      'URL 解析 → 缓存检查（强缓存直接命中）',
+      'DNS 解析得到 IP → TCP 三次握手 →（HTTPS）TLS 握手',
+      '发送 HTTP 请求 → 服务端处理 → 返回响应（协商缓存 304 / 重定向）',
+      '浏览器解析：HTML→DOM、CSS→CSSOM → Render Tree → Layout → Paint → 合成上屏',
+      'JS 加载执行（defer/async），触发 DOMContentLoaded 与 load',
+    ],
+    analysis:
+      '经典大题，按「网络 → 渲染」两段式答。网络段：缓存/DNS/TCP/TLS/HTTP；渲染段：解析、阻塞点、渲染流水线。追问点极多：缓存细节、三次握手、重排重绘、script 阻塞，每个子环节都要能展开。',
+    followups: ['强缓存与协商缓存的区别？', '如何优化首屏加载时间？'],
+  },
+  {
+    id: 'q-short-024',
+    type: 'short',
+    subject: 'browser',
+    difficulty: 2,
+    tags: ['browser-core'],
+    title: '如何减少重绘与回流？',
+    points: [
+      '批量改样式：class 切换代替逐条 style，或用 cssText',
+      '离线操作：documentFragment / display:none 后批量修改再显示',
+      '读写分离：避免「写→读→写」交错导致强制同步布局（读 offsetTop 等）',
+      '动画用 transform / opacity + will-change，走合成层',
+      '复杂元素脱离文档流（absolute/fixed）减少影响范围',
+    ],
+    analysis:
+      '按「减少次数、缩小范围、绕开流水线」三类作答。强制同步布局（layout thrashing）是高频追问：循环里先读几何再写样式每轮都触发回流。',
+  },
+  {
+    id: 'q-short-025',
+    type: 'short',
+    subject: 'network',
+    difficulty: 2,
+    tags: ['network-core', 'must-know'],
+    title: '完整描述 HTTP 缓存流程（强缓存 + 协商缓存）。',
+    points: [
+      '先查强缓存：Cache-Control: max-age（优先）/ Expires，未过期直接用本地副本，不发请求',
+      '强缓存失效 → 发请求带 If-None-Match（ETag）/ If-Modified-Since（Last-Modified）',
+      '服务端比对：未变 → 304 用本地缓存（只传 header）；变了 → 200 返回新资源',
+      'ETag 优先级高于 Last-Modified（后者精度只到秒）',
+      'Cache-Control 常用值：no-cache（每次协商）、no-store（不缓存）',
+    ],
+    analysis:
+      '画流程图式回答：命中强缓存 → 不发请求；未命中 → 协商 → 304/200。补一句 no-cache 与 no-store 的经典辨析即可收尾。',
+  },
+  {
+    id: 'q-short-026',
+    type: 'short',
+    subject: 'network',
+    difficulty: 3,
+    tags: ['network-core'],
+    title: 'TCP 如何保证可靠传输与拥塞控制？',
+    points: [
+      '可靠传输：序列号 + 确认应答 ACK + 超时重传 + 滑动窗口（流量控制）+ 校验和 + 去重',
+      '拥塞控制四板斧：慢启动、拥塞避免、快重传、快恢复',
+      '慢启动：cwnd 指数增长至阈值；拥塞避免：之后线性增长',
+      '快重传：收到 3 个重复 ACK 立即重传；快恢复：cwnd 降为阈值一半继续线性增长',
+    ],
+    analysis:
+      '可靠传输靠「确认 + 重传 + 窗口」；拥塞控制记四个机制与 cwnd 曲线（指数→线性→丢包后减半再线性）。能和 HTTP/3 QUIC 对比是加分项。',
+  },
+  {
+    id: 'q-short-027',
+    type: 'short',
+    subject: 'js',
+    difficulty: 1,
+    tags: ['js-handwrite', 'must-know'],
+    title: '防抖与节流的区别？各自适用什么场景？',
+    points: [
+      '防抖 debounce：停止触发后延迟执行，期间再触发重新计时 —— 搜索联想、表单校验、resize 结束处理',
+      '节流 throttle：固定频率执行，稀释事件流 —— 滚动加载、按钮防连点、拖拽跟随',
+      '一句话：防抖「等消停了再做」，节流「按节奏做」',
+    ],
+    analysis:
+      '定义 + 场景成对答，最后各给一个手写要点：防抖用 clearTimeout 重置计时；节流用时间戳或定时器开关。',
+    followups: ['分别手写实现一下'],
+  },
+  {
+    id: 'q-short-028',
+    type: 'short',
+    subject: 'vue',
+    difficulty: 2,
+    tags: ['vue-core', 'must-know'],
+    title: 'Vue diff 算法中 key 的作用是什么？为什么不能用 index 当 key？',
+    points: [
+      'key 是 vnode 的唯一标识，diff 时用于判断「同一节点可复用」',
+      'Vue3 双端 diff + 最长递增子序列：最小化 DOM 移动次数',
+      '用 index 当 key：列表重排/插入时 key 与数据错位，导致错误的 DOM 复用与状态串位（如 input 内容错位）',
+      '应使用数据自身的稳定 id',
+    ],
+    analysis:
+      '核心：key 决定复用关系。index 的问题在「非稳定」——顺序变化时 Vue 复用了错误的 DOM 与组件状态。补充双端比较（头头/尾尾/头尾/尾头）+ LIS 求最少移动是进阶加分。',
+    followups: ['Vue2 与 Vue3 diff 的区别？'],
+  },
+  {
+    id: 'q-short-029',
+    type: 'short',
+    subject: 'js',
+    difficulty: 2,
+    tags: ['must-know'],
+    title: '讲清原型链，并列举常见继承方式。',
+    points: [
+      '对象通过 __proto__ 指向构造函数的 prototype，逐级向上到 Object.prototype → null，形成原型链',
+      '属性查找沿链向上；instanceof 判断构造函数 prototype 是否在链上',
+      '继承方式：原型链继承、借用构造函数、组合继承、寄生组合式（最优经典）、ES6 class extends（语法糖）',
+      '寄生组合式：Object.create(Parent.prototype) 修正 constructor + 构造函数内 Parent.call(this)',
+    ],
+    analysis:
+      '先画链：实例 → Fn.prototype → Object.prototype → null。继承重点答寄生组合式为何最优（不重复调父构造函数、原型干净），class extends 本质是其语法糖。',
+    followups: ['new 操作符做了什么？', '手写 instanceof'],
+  },
+  {
+    id: 'q-short-030',
+    type: 'short',
+    subject: 'network',
+    difficulty: 3,
+    tags: ['network-core', 'must-know'],
+    title: 'XSS 与 CSRF 分别是什么？如何防御？',
+    points: [
+      'XSS（跨站脚本）：注入恶意脚本窃取信息 —— 防御：输出转义/CSP/HttpOnly Cookie/输入校验',
+      'CSRF（跨站请求伪造）：借用户登录态发伪造请求 —— 防御：SameSite Cookie / CSRF Token / 校验 Referer / 关键操作二次验证',
+      '本质区别：XSS 是注入脚本在用户浏览器执行，CSRF 是冒用身份发请求',
+    ],
+    analysis:
+      '对比式作答：攻击原理 → 防御清单 → 一句话区分。SameSite=Lax/Strict 是现代浏览器默认防线；CSP 用白名单限制脚本来源，是 XSS 纵深防御核心。',
+  },
+
+  // ============ 手撕 +10：算法 6 / JS 手写 4 ============
+  {
+    id: 'q-code-011',
+    type: 'code',
+    subject: 'algo',
+    difficulty: 3,
+    tags: ['lc-hot100', 'bytedance-r1'],
+    title: '实现 LRU 缓存（LC 146）：`get` / `put` 均要求 O(1)，超出容量时淘汰最久未使用的键。',
+    approach:
+      '哈希表保证 O(1) 查找，双向链表维护使用顺序（头部最新、尾部最旧）。get 命中后把节点移到头部；put 插入/更新到头部，超容量时摘除尾节点。',
+    analysis: `${codeBlock(
+      'js',
+      `class LRUCache {
+  constructor(capacity) {
+    this.cap = capacity
+    this.map = new Map() // key -> 双向链表节点
+    // 伪头伪尾，省去 null 边界判断
+    this.head = { prev: null, next: null }
+    this.tail = { prev: null, next: null }
+    this.head.next = this.tail
+    this.tail.prev = this.head
+  }
+  _remove(node) {
+    node.prev.next = node.next
+    node.next.prev = node.prev
+  }
+  _addFirst(node) {
+    // 插到头节点之后 = 最近使用
+    node.next = this.head.next
+    node.prev = this.head
+    this.head.next.prev = node
+    this.head.next = node
+  }
+  get(key) {
+    const node = this.map.get(key)
+    if (!node) return -1
+    this._remove(node)
+    this._addFirst(node) // 访问后刷新为最新
+    return node.val
+  }
+  put(key, val) {
+    if (this.map.has(key)) this._remove(this.map.get(key))
+    const node = { key, val, prev: null, next: null }
+    this.map.set(key, node)
+    this._addFirst(node)
+    if (this.map.size > this.cap) {
+      const lru = this.tail.prev // 尾部是最久未用
+      this._remove(lru)
+      this.map.delete(lru.key) // 别忘了同步清掉哈希表
+    }
+  }
+}`,
+    )}\n\n两个易错点：淘汰时哈希表要同步删除；伪头伪尾能把边界判断全部消掉。`,
+    complexity: '时间 O(1) / 空间 O(capacity)',
+    link: 'https://leetcode.cn/problems/lru-cache/',
+  },
+  {
+    id: 'q-code-012',
+    type: 'code',
+    subject: 'algo',
+    difficulty: 2,
+    tags: ['lc-hot100'],
+    title: '合并区间（LC 56）：合并所有重叠的区间，返回不重叠的区间数组。',
+    approach:
+      '先按起点排序，遍历维护结果数组：当前区间起点 ≤ 结果末尾区间的终点则合并（终点取 max），否则直接追加。',
+    analysis: `${codeBlock(
+      'js',
+      `function merge(intervals) {
+  if (!intervals.length) return []
+  // 按区间起点排序，合并才能线性扫描
+  intervals.sort((a, b) => a[0] - b[0])
+  const res = [intervals[0]]
+  for (let i = 1; i < intervals.length; i++) {
+    const last = res[res.length - 1]
+    const cur = intervals[i]
+    if (cur[0] <= last[1]) {
+      // 有重叠：终点取两者最大值
+      last[1] = Math.max(last[1], cur[1])
+    } else {
+      res.push(cur) // 无重叠，开启新区间
+    }
+  }
+  return res
+}`,
+    )}\n\n排序是前提：排完后任意重叠区间在数组中必然相邻可贪心合并。`,
+    complexity: '时间 O(n log n)（排序）/ 空间 O(n)',
+    link: 'https://leetcode.cn/problems/merge-intervals/',
+  },
+  {
+    id: 'q-code-013',
+    type: 'code',
+    subject: 'algo',
+    difficulty: 1,
+    tags: ['lc-hot100', 'must-know'],
+    title: '二叉树的层序遍历（LC 102）：按层返回节点值，结果为二维数组。',
+    approach:
+      'BFS 用队列。每轮先记录当前队列长度 n，循环弹出 n 个节点收值并入队其子节点 —— 这样一轮正好处理一整层。',
+    analysis: `${codeBlock(
+      'js',
+      `function levelOrder(root) {
+  if (!root) return []
+  const res = []
+  const queue = [root] // BFS 专用队列
+  while (queue.length) {
+    const size = queue.length // 先固定本层节点数，防止循环中被入队污染
+    const level = []
+    for (let i = 0; i < size; i++) {
+      const node = queue.shift()
+      level.push(node.val)
+      if (node.left) queue.push(node.left)
+      if (node.right) queue.push(node.right)
+    }
+    res.push(level) // 收集完一整层
+  }
+  return res
+}`,
+    )}\n\n关键是「按 size 分层」；若不需要分层，直接弹到空即可（LC 102 的简化版）。`,
+    complexity: '时间 O(n) / 空间 O(n)',
+    link: 'https://leetcode.cn/problems/binary-tree-level-order-traversal/',
+  },
+  {
+    id: 'q-code-014',
+    type: 'code',
+    subject: 'algo',
+    difficulty: 2,
+    tags: ['lc-hot100', 'nowcoder-hot'],
+    title: '三数之和（LC 15）：找出数组中所有和为 0 且不重复的三元组。',
+    approach:
+      '排序后枚举第一个数 a，剩余区间用左右双指针找 b + c = -a。每层都要跳过重复值来避免重复三元组。',
+    analysis: `${codeBlock(
+      'js',
+      `function threeSum(nums) {
+  const res = []
+  nums.sort((a, b) => a - b) // 排序后才能用双指针
+  for (let i = 0; i < nums.length - 2; i++) {
+    if (nums[i] > 0) break // 最小数已大于 0，后面不可能凑出 0
+    if (i > 0 && nums[i] === nums[i - 1]) continue // 第一个数去重
+    let l = i + 1
+    let r = nums.length - 1
+    while (l < r) {
+      const sum = nums[i] + nums[l] + nums[r]
+      if (sum === 0) {
+        res.push([nums[i], nums[l], nums[r]])
+        while (l < r && nums[l] === nums[l + 1]) l++ // 第二个数去重
+        while (l < r && nums[r] === nums[r - 1]) r-- // 第三个数去重
+        l++
+        r--
+      } else if (sum < 0) {
+        l++
+      } else {
+        r--
+      }
+    }
+  }
+  return res
+}`,
+    )}\n\n三处去重缺一不可；\`nums[i] > 0\` 提前剪枝是常见优化点。`,
+    complexity: '时间 O(n²) / 空间 O(log n)（排序栈）',
+    link: 'https://leetcode.cn/problems/3sum/',
+  },
+  {
+    id: 'q-code-015',
+    type: 'code',
+    subject: 'algo',
+    difficulty: 1,
+    tags: ['lc-hot100'],
+    title: '最大子数组和（LC 53）：找出具有最大和的连续子数组，返回其和。',
+    approach:
+      ' Kadane 算法：遍历维护「以当前元素结尾的最大和」cur，cur = max(当前值, cur + 当前值)，全程记录最大值。等价于前缀和 + 最小前缀。',
+    analysis: `${codeBlock(
+      'js',
+      `function maxSubArray(nums) {
+  let cur = nums[0] // 以当前元素结尾的最大和
+  let ans = nums[0] // 全局答案
+  for (let i = 1; i < nums.length; i++) {
+    // 前面的和为负就果断丢弃，从当前元素重新开始
+    cur = Math.max(nums[i], cur + nums[i])
+    ans = Math.max(ans, cur)
+  }
+  return ans
+}`,
+    )}\n\n一句话理解：\`cur\` 是「以 i 结尾的最大和」，负数前缀只会拖累后面，直接重启。全负数数组也能正确处理（ans 取最大单元素）。`,
+    complexity: '时间 O(n) / 空间 O(1)',
+    link: 'https://leetcode.cn/problems/maximum-subarray/',
+  },
+  {
+    id: 'q-code-016',
+    type: 'code',
+    subject: 'algo',
+    difficulty: 3,
+    tags: ['lc-hot100', 'bytedance-r2'],
+    title: '接雨水（LC 42）：给定柱状图高度，计算下雨后能接多少水。',
+    approach:
+      '双指针：left/right 从两端向中间收，各自维护 leftMax/rightMax。哪边最大值更小就结算哪边（木桶效应：低的一侧水位由它决定）。',
+    analysis: `${codeBlock(
+      'js',
+      `function trap(height) {
+  let left = 0
+  let right = height.length - 1
+  let leftMax = 0
+  let rightMax = 0
+  let water = 0
+  while (left < right) {
+    if (height[left] < height[right]) {
+      // 左边更矮：左指针处水位只取决于 leftMax
+      if (height[left] >= leftMax) leftMax = height[left] // 更新历史最高
+      else water += leftMax - height[left] // 能接的水 = 最高墙 - 当前高度
+      left++
+    } else {
+      if (height[right] >= rightMax) rightMax = height[right]
+      else water += rightMax - height[right]
+      right--
+    }
+  }
+  return water
+}`,
+    )}\n\n核心观察：当前位置能接的水 = min(左侧最高, 右侧最高) − 当前高度。双指针利用「较矮一侧的最大值已确定」把两次扫的空间优化到 O(1)。`,
+    complexity: '时间 O(n) / 空间 O(1)',
+    link: 'https://leetcode.cn/problems/trapping-rain-water/',
+  },
+  {
+    id: 'q-code-017',
+    type: 'code',
+    subject: 'js',
+    difficulty: 2,
+    tags: ['js-handwrite', 'bytedance-r1'],
+    title: '手写 `Promise.all`：全部成功才 resolve（保持顺序），任意一个 reject 立即 reject。',
+    approach:
+      '返回新 Promise。对输入逐个 Promise.resolve 包一层（兼容非 Promise 值），计数器统计完成数，结果按原下标写入保证顺序。',
+    analysis: `${codeBlock(
+      'js',
+      `function promiseAll(list) {
+  return new Promise((resolve, reject) => {
+    if (!list.length) return resolve([]) // 空数组直接成功
+    const results = new Array(list.length)
+    let done = 0
+    list.forEach((p, i) => {
+      // Promise.resolve 兼容普通值与 thenable
+      Promise.resolve(p).then(
+        (val) => {
+          results[i] = val // 按下标写入，保证输出顺序与输入一致
+          done++
+          if (done === list.length) resolve(results) // 全部完成才成功
+        },
+        reject, // 任何一个失败，整体立即失败
+      )
+    })
+  })
+}`,
+    )}\n\n三个考点：包 \`Promise.resolve\`、顺序用下标而非 push、空输入边界。对比记忆：allSettled 永不 reject，any 与 all 的成败语义相反。`,
+    complexity: '时间 O(n) / 空间 O(n)',
+  },
+  {
+    id: 'q-code-018',
+    type: 'code',
+    subject: 'js',
+    difficulty: 2,
+    tags: ['js-handwrite'],
+    title: '实现柯里化 `curry(fn)`：把多参数函数改造成可分批传参的形式，如 `add(1)(2)(3)`。',
+    approach:
+      '比较已收集参数个数与 fn.length：够数就执行原函数，不够就返回新函数继续收集（arguments 合并）。',
+    analysis: `${codeBlock(
+      'js',
+      `function curry(fn) {
+  return function curried(...args) {
+    // 参数已够：直接执行并返回结果
+    if (args.length >= fn.length) {
+      return fn.apply(this, args)
+    }
+    // 不够：返回新函数，合并已收集的参数继续等待
+    return function (...more) {
+      return curried.apply(this, args.concat(more)) // 旧参数 + 新参数
+    }
+  }
+}`,
+    )}\n\n注意 \`fn.length\` 只统计默认值/剩余参数之前的形参个数；用 apply 透传 this 才能在对象方法上也成立。`,
+    complexity: '每次调用 O(1)，展开执行时 O(n)',
+  },
+  {
+    id: 'q-code-019',
+    type: 'code',
+    subject: 'js',
+    difficulty: 1,
+    tags: ['js-handwrite', 'nowcoder-hot'],
+    title: '手写 `instanceof`：判断构造函数的 prototype 是否出现在对象的原型链上。',
+    approach:
+      '取左操作数的原型（Object.getPrototypeOf），沿原型链逐级向上与右操作数的 prototype 比较，直到命中或到达 null。',
+    analysis: `${codeBlock(
+      'js',
+      `function myInstanceof(obj, Fn) {
+  // 原始值没有原型链，直接 false
+  if (obj === null || (typeof obj !== 'object' && typeof obj !== 'function')) {
+    return false
+  }
+  let proto = Object.getPrototypeOf(obj)
+  while (proto) {
+    if (proto === Fn.prototype) return true // 链上找到构造函数的 prototype
+    proto = Object.getPrototypeOf(proto) // 继续向上走
+  }
+  return false // 走到 null 说明不在链上
+}`,
+    )}\n\n边界：原始值直接 false；右侧必须是函数（有 prototype）。\`Object.create(null)\` 的对象对任何构造函数都返回 false。`,
+    complexity: '时间 O(链长) / 空间 O(1)',
+  },
+  {
+    id: 'q-code-020',
+    type: 'code',
+    subject: 'js',
+    difficulty: 2,
+    tags: ['js-handwrite', 'meituan-r1'],
+    title: '实现一个发布订阅 `EventEmitter`：支持 `on` / `off` / `emit` / `once`。',
+    approach:
+      '用 Map 存「事件名 → 回调数组」。once 用包装函数实现：先 off 再执行原回调，防止递归触发时重复执行。',
+    analysis: `${codeBlock(
+      'js',
+      `class EventEmitter {
+  constructor() {
+    this.events = new Map() // 事件名 -> Set/数组
+  }
+  on(name, fn) {
+    if (!this.events.has(name)) this.events.set(name, new Set())
+    this.events.get(name).add(fn)
+    return this // 返回 this 支持链式调用
+  }
+  off(name, fn) {
+    this.events.get(name)?.delete(fn)
+    return this
+  }
+  emit(name, ...args) {
+    // 拷贝一份再遍历，避免回调里 off 自身导致遍历异常
+    ;[...(this.events.get(name) ?? [])].forEach((fn) => fn(...args))
+  }
+  once(name, fn) {
+    const wrapper = (...args) => {
+      this.off(name, wrapper) // 先解绑再执行，递归 emit 也只触发一次
+      fn(...args)
+    }
+    return this.on(name, wrapper)
+  }
+}`,
+    )}\n\n易错点：emit 遍历时若回调内 off 会改原数组，先拷贝快照；once 必须先 off 再执行。这就是 Vue2 事件总线 / Node events 的最小实现。`,
+    complexity: 'on/off O(1)，emit O(监听器数)',
   },
 ]
