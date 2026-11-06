@@ -123,9 +123,18 @@ function authHeader(user: string, pass: string): string {
   return `Basic ${btoa(`${user}:${pass}`)}`
 }
 
+let dirReady = false // 目录建过一次就不再请求，省坚果云配额
+
 async function ensureDir(dirUrl: string, auth: string): Promise<void> {
-  await fetch(dirUrl, { method: 'MKCOL', headers: { Authorization: auth } }).catch(() => {})
-  // 已存在返回 405，属正常，忽略
+  if (dirReady) return
+  // 201 新建 / 405 已存在都算成功；部分服务端要求集合路径带末尾斜杠，失败再用斜杠形式试一次
+  const okStatus = (r: Response | null) =>
+    !!r && (r.status === 201 || r.status === 200 || r.status === 204 || r.status === 405)
+  const mkcol = (u: string) =>
+    fetch(u, { method: 'MKCOL', headers: { Authorization: auth } }).catch(() => null)
+
+  if (okStatus(await mkcol(dirUrl))) dirReady = true
+  else if (okStatus(await mkcol(`${dirUrl}/`))) dirReady = true
 }
 
 async function remoteGet(fileUrl: string, auth: string): Promise<SyncPayload | null> {
