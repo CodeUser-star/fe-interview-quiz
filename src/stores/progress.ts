@@ -35,6 +35,7 @@ export const useProgressStore = defineStore('progress', () => {
           stage: 0,
           dueAt: now + INTERVALS[0] * DAY,
           addedAt: item?.addedAt ?? now,
+          updatedAt: now,
         },
       }
       return
@@ -49,7 +50,7 @@ export const useProgressStore = defineStore('progress', () => {
     }
     review.value = {
       ...review.value,
-      [qid]: { ...item, stage, dueAt: now + INTERVALS[stage] * DAY },
+      [qid]: { ...item, stage, dueAt: now + INTERVALS[stage] * DAY, updatedAt: now },
     }
   }
 
@@ -57,7 +58,10 @@ export const useProgressStore = defineStore('progress', () => {
   function enqueue(qid: string): void {
     if (review.value[qid]) return
     const now = Date.now()
-    review.value = { ...review.value, [qid]: { qid, stage: 0, dueAt: now, addedAt: now } }
+    review.value = {
+      ...review.value,
+      [qid]: { qid, stage: 0, dueAt: now, addedAt: now, updatedAt: now },
+    }
   }
 
   function dequeue(qid: string): void {
@@ -69,7 +73,10 @@ export const useProgressStore = defineStore('progress', () => {
   function setWrongReason(qid: string, reason: WrongReason): void {
     const item = review.value[qid]
     if (!item) return
-    review.value = { ...review.value, [qid]: { ...item, wrongReason: reason } }
+    review.value = {
+      ...review.value,
+      [qid]: { ...item, wrongReason: reason, updatedAt: Date.now() },
+    }
   }
 
   function isInReview(qid: string): boolean {
@@ -85,9 +92,18 @@ export const useProgressStore = defineStore('progress', () => {
   }
 
   function setNote(qid: string, text: string): void {
-    const next = { ...meta.value, notes: { ...meta.value.notes } }
-    if (text.trim()) next.notes[qid] = text
-    else delete next.notes[qid]
+    const next: Meta = {
+      ...meta.value,
+      notes: { ...meta.value.notes },
+      noteTs: { ...meta.value.noteTs },
+    }
+    if (text.trim()) {
+      next.notes[qid] = text
+      next.noteTs![qid] = Date.now()
+    } else {
+      delete next.notes[qid]
+      delete next.noteTs![qid]
+    }
     meta.value = next
   }
 
@@ -213,7 +229,7 @@ export const useProgressStore = defineStore('progress', () => {
     if (Array.isArray(p.records)) records.value = p.records
     if (p.review && typeof p.review === 'object') review.value = p.review
     if (p.meta && typeof p.meta === 'object')
-      meta.value = { stars: p.meta.stars ?? {}, notes: p.meta.notes ?? {} }
+      meta.value = { stars: p.meta.stars ?? {}, notes: p.meta.notes ?? {}, noteTs: p.meta.noteTs ?? {} }
     if (p.checkins && typeof p.checkins === 'object') checkins.value = p.checkins
   }
 

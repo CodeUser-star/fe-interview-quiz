@@ -246,6 +246,25 @@ check('星标逐键取大时间戳', merged.meta.stars.a === 300 && merged.meta.
 check('打卡逐日取大时间戳', merged.checkins['2026-11-06'] === 500 && merged.checkins['2026-11-05'] === 300)
 check('笔记本地优先、远端补缺', merged.meta.notes.a === 'local' && merged.meta.notes.c === 'remote')
 
+// 带时间戳的 LWW：答错重置（updatedAt 更新）必须覆盖远端的旧进度
+const mergedReset = mergeProgress(
+  {
+    review: { r: { qid: 'r', stage: 0, dueAt: NOW2 + 1000, addedAt: 1, updatedAt: 9000 } },
+    meta: { stars: {}, notes: { n: 'local-new' }, noteTs: { n: 9000 } },
+  },
+  {
+    review: { r: { qid: 'r', stage: 4, dueAt: NOW2 + 30 * DAY, addedAt: 1, updatedAt: 1000 } },
+    meta: { stars: {}, notes: { n: 'remote-old' }, noteTs: { n: 1000 } },
+  },
+)
+check('复习重置能覆盖旧进度', mergedReset.review.r.stage === 0, `stage=${mergedReset.review.r.stage}`)
+check('笔记按时间戳 LWW（本地新）', mergedReset.meta.notes.n === 'local-new')
+const mergedRemoteNote = mergeProgress(
+  { meta: { stars: {}, notes: { x: 'old' }, noteTs: { x: 1 } } },
+  { meta: { stars: {}, notes: { x: 'new' }, noteTs: { x: 9 } } },
+)
+check('笔记按时间戳 LWW（远端新）', mergedRemoteNote.meta.notes.x === 'new')
+
 const mergedCustom = mergeCustom(
   [{ id: 'q1', title: 'local' } as never],
   [{ id: 'q1', title: 'remote' } as never, { id: 'q2', title: 'r2' } as never],

@@ -39,6 +39,8 @@ const PUSH_DEBOUNCE = 3000
 const RETRY_DELAY = 30_000
 
 let applying = false // 正在写入合并结果，避免触发推送循环
+let skipPushOnce = false // 合并写回引发的 watcher，跳过一次推送
+let inFlight = false // 同步互斥，避免防抖推送与手动同步交错 PUT
 let pushTimer: ReturnType<typeof setTimeout> | null = null
 let retryTimer: ReturnType<typeof setTimeout> | null = null
 
@@ -49,7 +51,8 @@ function recordKey(r: AnswerRecord): string {
 }
 
 function reviewActivity(item: ReviewItem): number {
-  return Math.max(item.dueAt, item.addedAt)
+  // 优先用显式 updatedAt；旧数据退化为 addedAt / dueAt 的较大值
+  return item.updatedAt ?? Math.max(item.dueAt, item.addedAt)
 }
 
 /** 记录级 LWW 合并本地与远端的进度数据 */
@@ -85,11 +88,21 @@ export function mergeProgress(
     if (!checkins[day] || ts > checkins[day]) checkins[day] = ts
   }
 
-  // 笔记无时间戳：本地优先（本地刚编辑过），本地没有才用远端
+  // 笔记按 noteTs 逐键 LWW；旧数据无时间戳时本地优先（视为刚编辑过）
+  const localTs = local.meta?.noteTs ?? {}
+  const remoteTs = remote.meta?.noteTs ?? {}
   const notes: Record<string, string> = { ...(remote.meta?.notes ?? {}) }
-  for (const [qid, text] of Object.entries(local.meta?.notes ?? {})) notes[qid] = text
+  const noteTs: Record<string, number> = { ...remoteTs }
+  for (const [qid, text] of Object.entries(local.meta?.notes ?? {})) {
+    const lt = localTs[qid] ?? Number.MAX_SAFE_INTEGER // 本地无 ts 视为最新（兼容旧数据）
+    const rt = remoteTs[qid] ?? 0
+    if (lt >= rt) {
+      notes[qid] = text
+      if (localTs[qid]) noteTs[qid] = localTs[qid]
+    }
+  }
 
-  return { records, review, meta: { stars, notes }, checkins }
+  return { records, review, meta: { stars, notes, noteTs }, checkins }
 }
 
 /** 自定义题按 id 求并集，冲突时本地优先（本地是最近编辑方） */
@@ -158,6 +171,8 @@ export async function syncNow(): Promise<boolean> {
     syncStatus.value = 'off'
     return false
   }
+  if (inFlight) return false // 已有同步在进行，直接跳过，由本轮结果覆盖
+  inFlight = true
   const { fileUrl, dirUrl } = endpoint(cfg.url)
   syncStatus.value = 'syncing'
   try {
@@ -177,6 +192,7 @@ export async function syncNow(): Promise<boolean> {
         }
       } finally {
         applying = false
+        skipPushOnce = true // 合并写回本身就是同步结果，不再回推一次
       }
     }
     await remotePut(fileUrl, cfg.auth, localPayload())
@@ -190,12 +206,19 @@ export async function syncNow(): Promise<boolean> {
     console.warn('[sync]', e)
     scheduleRetry()
     return false
+  } finally {
+    inFlight = false
   }
 }
 
 /** 防抖推送：本地变动后 3 秒同步一次 */
 export function schedulePush(): void {
-  if (applying || !configured()) return
+  if (!configured()) return
+  if (skipPushOnce) {
+    skipPushOnce = false
+    return
+  }
+  if (applying) return
   if (pushTimer) clearTimeout(pushTimer)
   pushTimer = setTimeout(() => {
     pushTimer = null

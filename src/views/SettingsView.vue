@@ -175,7 +175,7 @@ async function runSync(): Promise<void> {
   <div class="page">
     <div class="page-head">
       <h1 class="page-title">设置</h1>
-      <span class="page-sub">v1.1 · 阶段一</span>
+      <span class="page-sub">v1.2 · 全功能</span>
     </div>
 
     <div v-if="message" class="banner" :class="messageKind === 'ok' ? 'ok' : ''">
@@ -374,7 +374,7 @@ async function runSync(): Promise<void> {
       <div class="card">
         <div class="setting-row" style="border-bottom: 0; padding-bottom: 0">
           <div class="setting-label">
-            <b>前端面试刷题 v1.1</b>
+            <b>前端面试刷题 v1.2</b>
             <span>纯本地 PWA · 正确率 =（自动判对 + 自判掌握）÷ 总答题次数</span>
           </div>
         </div>

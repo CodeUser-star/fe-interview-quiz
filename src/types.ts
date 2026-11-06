@@ -39,6 +39,8 @@ export interface ReviewItem {
   stage: number
   dueAt: number
   addedAt: number
+  /** 最后一次变更时间，供跨端 LWW 合并使用（旧数据可能缺失） */
+  updatedAt?: number
   wrongReason?: WrongReason
 }
 
@@ -73,6 +75,8 @@ export interface Settings {
 export interface Meta {
   stars: Record<string, number>
   notes: Record<string, string>
+  /** 每条笔记的最后修改时间戳，用于同步时 last-write-wins 合并 */
+  noteTs?: Record<string, number>
 }
 
 /** 打卡记录：日期串 → 时间戳 */
