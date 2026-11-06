@@ -1,0 +1,10 @@
+name = "feq-sync"
+main = "feq-sync.js"
+compatibility_date = "2026-11-01"
+
+# 凭据不要写在这里，用 wrangler secret 注入：
+#   wrangler secret put DAV_USER
+#   wrangler secret put DAV_PASS
+# 可选：限制来源
+# [vars]
+# ALLOWED_ORIGIN = "https://codeuser-star.github.io"

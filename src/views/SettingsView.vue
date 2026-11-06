@@ -339,13 +339,13 @@ async function runSync(): Promise<void> {
         <div class="setting-row">
           <div class="setting-label">
             <b>服务器地址</b>
-            <span>填 WebDAV 根地址；坚果云官方 DAV 不支持浏览器直连，需填代理地址</span>
+            <span>填 Worker 地址，如 https://feq-sync.xxx.workers.dev（凭据在 Worker 里，账号密码留空）</span>
           </div>
           <input
             v-model="syncUrlInput"
             class="num-input"
             style="width: 240px"
-            placeholder="https://你的代理域名/dav"
+            placeholder="https://feq-sync.xxx.workers.dev"
           />
         </div>
         <div class="setting-row">
