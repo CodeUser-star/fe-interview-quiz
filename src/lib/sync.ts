@@ -160,8 +160,43 @@ function localPayload(): SyncPayload {
 
 function configured(): { url: string; auth: string } | null {
   const settings = useSettingsStore()
-  if (!settings.syncUrl || !settings.syncUser) return null
+  if (!settings.syncUrl) return null
   return { url: settings.syncUrl, auth: authHeader(settings.syncUser, settings.syncPass) }
+}
+
+/** 连接测试：区分鉴权失败与浏览器跨域拦截，便于排查配置 */
+export async function testConnection(
+  url: string,
+  user: string,
+  pass: string,
+): Promise<{ ok: boolean; message: string }> {
+  const target = url.trim().replace(/\/+$/, '')
+  if (!target) return { ok: false, message: '请先填写服务器地址' }
+  const { fileUrl, dirUrl } = endpoint(target)
+  const auth = authHeader(user, pass)
+  try {
+    const dir = await fetch(dirUrl, { method: 'MKCOL', headers: { Authorization: auth } })
+    if (dir.status === 401 || dir.status === 403) {
+      return { ok: false, message: '账号或应用密码不正确（坚果云需用「应用密码」而非登录密码）' }
+    }
+    const probe = await fetch(fileUrl, { headers: { Authorization: auth } })
+    if (probe.status === 401 || probe.status === 403) {
+      return { ok: false, message: '鉴权失败：账号或应用密码不正确' }
+    }
+    if (!probe.ok && probe.status !== 404) {
+      return { ok: false, message: `服务器返回 ${probe.status}，请检查地址是否指向 WebDAV 根目录` }
+    }
+    return {
+      ok: true,
+      message: probe.status === 404 ? '连接成功，云端暂无备份（首次同步会上传）' : '连接成功，已找到云端备份',
+    }
+  } catch {
+    return {
+      ok: false,
+      message:
+        '浏览器被跨域（CORS）拦截：目标服务未开放 Access-Control-Allow-Origin。坚果云官方 DAV 不支持浏览器直连，请改填代理地址。',
+    }
+  }
 }
 
 /** 完整同步：拉远端 → 合并写回本地 → 把合并结果推回远端 */
@@ -202,7 +237,11 @@ export async function syncNow(): Promise<boolean> {
     return true
   } catch (e) {
     syncStatus.value = 'error'
-    lastError.value = e instanceof Error ? e.message : String(e)
+    const raw = e instanceof Error ? e.message : String(e)
+    lastError.value =
+      raw === 'Failed to fetch' || e instanceof TypeError
+        ? '跨域被拦截（CORS）：坚果云官方 DAV 不支持浏览器直连，请填写代理地址'
+        : raw
     console.warn('[sync]', e)
     scheduleRetry()
     return false

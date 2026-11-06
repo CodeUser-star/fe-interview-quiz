@@ -7,7 +7,7 @@ import { useBankStore } from '../stores/bank'
 import { useSettingsStore } from '../stores/settings'
 import { useProgressStore } from '../stores/progress'
 import { validateQuestionList } from '../lib/validate'
-import { lastError, lastSyncAt, setupSync, syncNow, syncStatus } from '../lib/sync'
+import { lastError, lastSyncAt, setupSync, syncNow, syncStatus, testConnection } from '../lib/sync'
 import { toast } from '../lib/toast'
 import AppIcon from '../components/AppIcon.vue'
 import EditQuestionDialog from '../components/EditQuestionDialog.vue'
@@ -162,6 +162,16 @@ function saveSync(): void {
   settings.setSync(syncUrlInput.value, syncUserInput.value, syncPassInput.value)
   setupSync() // 首次配置后立即启动自动同步
   toast('同步配置已保存')
+}
+
+const testing = ref(false)
+const testResult = ref<{ ok: boolean; message: string } | null>(null)
+
+async function runTest(): Promise<void> {
+  testing.value = true
+  testResult.value = null
+  testResult.value = await testConnection(syncUrlInput.value, syncUserInput.value, syncPassInput.value)
+  testing.value = false
 }
 
 async function runSync(): Promise<void> {
@@ -329,19 +339,19 @@ async function runSync(): Promise<void> {
         <div class="setting-row">
           <div class="setting-label">
             <b>服务器地址</b>
-            <span>坚果云为 https://dav.jianguoyun.com/dav</span>
+            <span>填 WebDAV 根地址；坚果云官方 DAV 不支持浏览器直连，需填代理地址</span>
           </div>
           <input
             v-model="syncUrlInput"
             class="num-input"
             style="width: 240px"
-            placeholder="https://dav.jianguoyun.com/dav"
+            placeholder="https://你的代理域名/dav"
           />
         </div>
         <div class="setting-row">
           <div class="setting-label">
             <b>账号 / 应用密码</b>
-            <span>坚果云「安全选项 → 第三方应用管理」生成应用密码；明文存本机，仅自用</span>
+            <span>代理已注入凭据时可留空；直连需「第三方应用管理」生成的应用密码</span>
           </div>
           <div class="btn-row">
             <input v-model="syncUserInput" class="num-input" style="width: 140px" placeholder="邮箱" />
@@ -354,12 +364,20 @@ async function runSync(): Promise<void> {
             />
           </div>
         </div>
+        <div v-if="testResult" class="setting-row" style="border-bottom: 0; padding: 10px 0 0">
+          <div class="banner" :class="testResult.ok ? 'ok' : ''" style="margin: 0; width: 100%">
+            {{ testResult.message }}
+          </div>
+        </div>
         <div class="setting-row" style="border-bottom: 0; padding-bottom: 0">
           <div class="setting-label">
             <b>{{ lastSyncText }}</b>
             <span v-if="lastError" style="color: var(--bad)">{{ lastError }}</span>
           </div>
           <div class="btn-row">
+            <button class="btn btn-sm btn-ghost" :disabled="testing" @click="runTest">
+              {{ testing ? '测试中…' : '测试连接' }}
+            </button>
             <button class="btn btn-sm btn-ghost" @click="saveSync">保存配置</button>
             <button class="btn btn-sm" :disabled="syncStatus === 'syncing'" @click="runSync">
               立即同步
